@@ -40,7 +40,7 @@ class InspectScreenArguments(ToolArguments):
     )
     scope: ScreenScope = Field(
         default="active_window",
-        description="Inspect the focused window or the complete multi-monitor desktop.",
+        description="Focused window or full desktop.",
     )
 
 
@@ -49,17 +49,16 @@ class ActivateVisualTargetArguments(ToolArguments):
         min_length=1,
         max_length=240,
         description=(
-            "Visible target to activate, such as 'the Install button'. Vision is used first; "
-            "Windows UI Automation may be used internally only as a fallback."
+            "Visible target, e.g. 'the Install button'."
         ),
     )
     action: Literal["click"] = Field(
         default="click",
-        description="Activate the visible target. Currently only click is supported.",
+        description="Action to perform.",
     )
     scope: ScreenScope = Field(
         default="active_window",
-        description="Search the focused window unless the target is explicitly elsewhere.",
+        description="Focused window or full desktop.",
     )
 
 
@@ -120,8 +119,7 @@ class WindowsPointerController:
 class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
     name = "inspect_screen"
     description = (
-        "Use local vision to answer what is visible in the focused window or desktop. This is "
-        "not a prerequisite for clicks; do not use it for a request to click a named target."
+        "Inspect visible screen content; for a named click use activate_visual_target directly."
     )
     arguments_type = InspectScreenArguments
     result_type = ScreenInspectionResult
@@ -278,8 +276,7 @@ class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
 class ActivateVisualTargetTool(Tool[ActivateVisualTargetArguments, VisualActionResult]):
     name = "activate_visual_target"
     description = (
-        "Use this to click a user-named visible desktop target; do not call inspect_screen first. "
-        "It locates the target with vision and can fall back to Windows UI Automation internally."
+        "Click a named visible desktop target directly with vision-first targeting."
     )
     arguments_type = ActivateVisualTargetArguments
     result_type = VisualActionResult

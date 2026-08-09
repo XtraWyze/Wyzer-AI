@@ -1,9 +1,15 @@
 import pytest
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from tests.fakes import EchoTool
+from wyzer.models import ToolArguments
 from wyzer.tools import ToolRegistry
 from wyzer.tools.registry import DuplicateToolError, UnknownToolError
+from wyzer.tools.schema import model_parameters
+
+
+class TitleArguments(ToolArguments):
+    title: str = Field(description="A real argument named title.")
 
 
 def test_registry_rejects_duplicates() -> None:
@@ -28,4 +34,11 @@ def test_registry_validates_arguments_and_exposes_manifest() -> None:
     assert registry.compact_manifest()[0]["name"] == "echo"
     native = registry.native_tools()[0]
     assert native.function.name == "echo"
-    assert native.function.parameters == EchoTool.arguments_type.model_json_schema()
+    assert native.function.parameters == model_parameters(EchoTool.arguments_type)
+
+
+def test_compact_model_schema_preserves_an_argument_named_title() -> None:
+    parameters = model_parameters(TitleArguments)
+
+    assert "title" in parameters["properties"]
+    assert parameters["required"] == ["title"]

@@ -270,7 +270,7 @@ def _resolve_destination(source: Path, requested: Path) -> Path:
 
 class SearchFilesTool(FileToolBase, Tool[SearchFilesArguments, FileSearchResult]):
     name = "search_files"
-    description = "Search indexed files across all drives by name, path, and safe text content."
+    description = "Search indexed local files by name, path, or safe text content."
     arguments_type = SearchFilesArguments
     result_type = FileSearchResult
     risk_level = RiskLevel.LOW
@@ -305,8 +305,7 @@ class SearchFilesTool(FileToolBase, Tool[SearchFilesArguments, FileSearchResult]
 class ListDirectoryTool(FileToolBase, Tool[ListDirectoryArguments, DirectoryListingResult]):
     name = "list_directory"
     description = (
-        "List files and folders inside an exact local directory path, including "
-        "~/Desktop-style paths."
+        "List files and folders in an exact local directory."
     )
     arguments_type = ListDirectoryArguments
     result_type = DirectoryListingResult
@@ -358,8 +357,7 @@ class ListDirectoryTool(FileToolBase, Tool[ListDirectoryArguments, DirectoryList
 class CreateDirectoryTool(FileToolBase, Tool[CreateDirectoryArguments, PathOperationResult]):
     name = "create_directory"
     description = (
-        "Create a local folder at an exact path. Use ~/Desktop or ~/Downloads when the user "
-        "names those locations."
+        "Create a local folder at an exact path."
     )
     arguments_type = CreateDirectoryArguments
     result_type = PathOperationResult
@@ -394,8 +392,7 @@ class CreateDirectoryTool(FileToolBase, Tool[CreateDirectoryArguments, PathOpera
 class CopyPathTool(FileToolBase, Tool[CopyPathArguments, PathOperationResult]):
     name = "copy_path"
     description = (
-        "Copy one local file or folder to a new location. Existing destinations are never "
-        "overwritten implicitly."
+        "Copy a local file or folder without overwriting an existing destination."
     )
     arguments_type = CopyPathArguments
     result_type = PathOperationResult
@@ -427,8 +424,7 @@ class CopyPathTool(FileToolBase, Tool[CopyPathArguments, PathOperationResult]):
 class MovePathTool(FileToolBase, Tool[MovePathArguments, PathOperationResult]):
     name = "move_path"
     description = (
-        "Move one local file or folder to a new location. Existing destinations are never "
-        "overwritten implicitly."
+        "Move a local file or folder without overwriting an existing destination."
     )
     arguments_type = MovePathArguments
     result_type = PathOperationResult
@@ -458,8 +454,7 @@ class MovePathTool(FileToolBase, Tool[MovePathArguments, PathOperationResult]):
 class RenamePathTool(FileToolBase, Tool[RenamePathArguments, PathOperationResult]):
     name = "rename_path"
     description = (
-        "Rename one existing local file or folder without changing its parent directory. "
-        "Never overwrites another path."
+        "Rename a local file or folder within its parent; never overwrite."
     )
     arguments_type = RenamePathArguments
     result_type = PathOperationResult
@@ -494,8 +489,7 @@ class RenamePathTool(FileToolBase, Tool[RenamePathArguments, PathOperationResult
 class DeletePathTool(FileToolBase, Tool[DeletePathArguments, PathOperationResult]):
     name = "delete_path"
     description = (
-        "Delete one local file or folder by sending it to the Windows Recycle Bin. Always "
-        "requires user confirmation."
+        "Send a local file or folder to the Recycle Bin; requires confirmation."
     )
     arguments_type = DeletePathArguments
     result_type = PathOperationResult
@@ -527,8 +521,7 @@ class OpenIndexedFolderTool(
 ):
     name = "open_indexed_folder"
     description = (
-        "Find a project or folder in the local file index, open it, and optionally place its "
-        "Explorer window using a spatial or numbered monitor destination."
+        "Find and open an indexed folder, optionally on a specified monitor."
     )
     arguments_type = OpenIndexedFolderArguments
     result_type = IndexedFolderOpenResult
@@ -642,7 +635,7 @@ class OpenIndexedFolderTool(
 
 class ReadTextFileTool(FileToolBase, Tool[ReadTextFileArguments, TextFileResult]):
     name = "read_text_file"
-    description = "Read bounded text from a non-sensitive local file for answering questions."
+    description = "Read bounded text from a non-sensitive local file."
     arguments_type = ReadTextFileArguments
     result_type = TextFileResult
     risk_level = RiskLevel.LOW
@@ -663,7 +656,7 @@ class ReadTextFileTool(FileToolBase, Tool[ReadTextFileArguments, TextFileResult]
 
 class RefreshFileIndexTool(FileToolBase, Tool[RefreshFileIndexArguments, FileIndexResult]):
     name = "refresh_file_index"
-    description = "Incrementally index safe file metadata and text content across all local drives."
+    description = "Refresh the local index of safe file metadata and text."
     arguments_type = RefreshFileIndexArguments
     result_type = FileIndexResult
     risk_level = RiskLevel.MEDIUM

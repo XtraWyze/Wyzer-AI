@@ -130,13 +130,13 @@ class ListWindowsArguments(ToolArguments):
         default=None,
         min_length=1,
         max_length=64,
-        description="Optional monitor such as 1, 2, left, right, or a display name.",
+        description="Monitor number, relation, or display name.",
     )
     query: str | None = Field(
         default=None,
         min_length=1,
         max_length=260,
-        description="Optional application name or visible window-title text.",
+        description="App name or visible window title.",
     )
 
 
@@ -155,7 +155,7 @@ class OpenApplicationArguments(ToolArguments):
     application: str = Field(
         min_length=1,
         max_length=260,
-        description="Friendly installed application name, such as Calculator, Spotify, or Discord.",
+        description="Installed app name, e.g. Calculator or Spotify.",
     )
 
 
@@ -163,37 +163,37 @@ class ApplicationSearchArguments(ToolArguments):
     query: str = Field(
         min_length=1,
         max_length=260,
-        description="Application name or partial name to search for.",
+        description="Full or partial app name.",
     )
 
 
 class OpenFileArguments(ToolArguments):
     path: Path = Field(
-        description="Exact local file path to open with its default Windows application."
+        description="Exact local file path."
     )
 
 
 class MediaControlArguments(ToolArguments):
     action: Literal["play_pause", "next", "previous", "stop"] = Field(
-        description="Media action to send to the current system media session."
+        description="Media action."
     )
 
 
 class MasterAudioArguments(ToolArguments):
     operation: Literal["increase", "decrease", "set", "mute", "unmute", "toggle_mute", "get"] = (
-        Field(description="Audio operation to perform.")
+        Field(description="Audio operation.")
     )
     amount: int | None = Field(
         default=None,
         ge=1,
         le=100,
-        description="Percentage-point change for increase or decrease.",
+        description="Change for increase/decrease.",
     )
     level: int | None = Field(
         default=None,
         ge=0,
         le=100,
-        description="Exact volume percentage for set.",
+        description="Exact level for set.",
     )
 
     @model_validator(mode="after")
@@ -215,11 +215,11 @@ class ApplicationAudioArguments(MasterAudioArguments):
     application: str = Field(
         min_length=1,
         max_length=260,
-        description="Friendly application or audio-session name, such as Spotify or Chrome.",
+        description="App or audio-session name.",
     )
     scope: Literal["one", "all"] = Field(
         default="all",
-        description="Use all for every matching audio session; use one for a single match.",
+        description="Change one or all matching sessions.",
     )
 
 
@@ -227,7 +227,7 @@ class AudioSessionsBatchArguments(ToolArguments):
     applications: list[str] = Field(
         min_length=1,
         max_length=20,
-        description="Application names that should remain unmuted; every other audio session is muted.",
+        description="Apps to keep unmuted.",
     )
 
 
@@ -298,14 +298,13 @@ class MoveNamedWindowArguments(ToolArguments):
     window: str = Field(
         min_length=1,
         max_length=260,
-        description="Application name or visible title of exactly one open window.",
+        description="App name or title of one open window.",
     )
     destination: str = Field(
         min_length=1,
         max_length=128,
         description=(
-            "Monitor destination such as other, primary, left, right, above, below, nearest, "
-            "previous, monitor 1, monitor 2, or an exact friendly display name."
+            "Relation, monitor number, or friendly display name."
         ),
     )
 
@@ -338,14 +337,14 @@ class NamedWindowActionArguments(ToolArguments):
     window: str = Field(
         min_length=1,
         max_length=260,
-        description="Application name or visible window-title text.",
+        description="App name or visible window title.",
     )
     action: Literal["focus", "minimize", "maximize", "restore", "close"] = Field(
-        description="Window action to perform."
+        description="Window action."
     )
     all_matches: bool = Field(
         default=False,
-        description="Apply the action to every matching window instead of requiring one unique match.",
+        description="Apply to all matches instead of one unique match.",
     )
 
 
@@ -545,9 +544,7 @@ class GetSystemProfileTool(WindowsToolBase, Tool[NoArguments, SystemProfileResul
 class IsProcessRunningTool(WindowsToolBase, Tool[ProcessQueryArguments, ProcessRunningResult]):
     name = "is_process_running"
     description = (
-        "Check whether a named background process is currently running, including processes with "
-        "no desktop window. Use list_open_windows instead when the user asks whether an "
-        "application or window is open."
+        "Check a background process; use list_open_windows for desktop app/window status."
     )
     arguments_type = ProcessQueryArguments
     result_type = ProcessRunningResult
@@ -649,9 +646,7 @@ class OpenApplicationTool(
 ):
     name = "open_application"
     description = (
-        "Open or focus a Windows desktop application. Reuse an existing window when possible "
-        "and launch the application only when needed. Do not use this for webpage navigation "
-        "or browser searches; use the browser tool pack for those tasks."
+        "Open or focus a Windows desktop app. For web tasks use browser_* tools."
     )
     arguments_type = OpenApplicationArguments
     result_type = BringUpApplicationResult
@@ -817,7 +812,7 @@ class SearchInstalledApplicationsTool(
     WindowsToolBase, Tool[ApplicationSearchArguments, ApplicationSearchResult]
 ):
     name = "search_installed_applications"
-    description = "Search indexed Start Menu, Xbox/Game Pass, Store, Steam, and Epic applications."
+    description = "Search installed desktop apps and games."
     arguments_type = ApplicationSearchArguments
     result_type = ApplicationSearchResult
     risk_level = RiskLevel.LOW
@@ -847,7 +842,7 @@ class RefreshApplicationIndexTool(WindowsToolBase, Tool[NoArguments, Application
 
 class ListInstalledGamesTool(WindowsToolBase, Tool[NoArguments, InstalledGamesResult]):
     name = "list_installed_games"
-    description = "List installed games discovered from Xbox, Steam, Epic, EA, and Battle.net."
+    description = "List installed games."
     arguments_type = NoArguments
     result_type = InstalledGamesResult
     risk_level = RiskLevel.LOW
@@ -876,7 +871,7 @@ class ListInstalledApplicationsTool(WindowsToolBase, Tool[NoArguments, Applicati
 
 class OpenFileTool(WindowsToolBase, Tool[OpenFileArguments, OpenTargetResult]):
     name = "open_file"
-    description = "Ask Windows to open an existing file with its associated application."
+    description = "Open an existing file in its default Windows app."
     arguments_type = OpenFileArguments
     result_type = OpenTargetResult
     risk_level = RiskLevel.MEDIUM
@@ -948,7 +943,7 @@ def _unverified_command(target: str) -> OpenTargetResult:
 
 class ControlMediaTool(WindowsToolBase, Tool[MediaControlArguments, OpenTargetResult]):
     name = "control_media"
-    description = "Control active Windows media: play/pause, next, previous, or stop."
+    description = "Control the active Windows media session."
     arguments_type = MediaControlArguments
     result_type = OpenTargetResult
     risk_level = RiskLevel.MEDIUM
@@ -963,7 +958,7 @@ class ControlMediaTool(WindowsToolBase, Tool[MediaControlArguments, OpenTargetRe
 class GetCurrentMediaTool(WindowsToolBase, Tool[NoArguments, CurrentMediaResult]):
     name = "get_current_media"
     description = (
-        "Read the current Windows media session's song, artist, album, source, and status."
+        "Read current media title, artist, album, source, and status."
     )
     arguments_type = NoArguments
     result_type = CurrentMediaResult
@@ -978,9 +973,7 @@ class GetCurrentMediaTool(WindowsToolBase, Tool[NoArguments, CurrentMediaResult]
 class ControlMasterAudioTool(WindowsToolBase, Tool[MasterAudioArguments, MasterAudioResult]):
     name = "control_master_audio"
     description = (
-        "Read or control master Windows output audio. increase/decrease are relative percentage "
-        "points; set is an exact 0-100 level. Use this for unqualified requests such as 'turn the "
-        "volume down', not for a named application's volume."
+        "Read or control master Windows audio, not a named app's audio."
     )
     arguments_type = MasterAudioArguments
     result_type = MasterAudioResult
@@ -999,8 +992,7 @@ class ControlMasterAudioTool(WindowsToolBase, Tool[MasterAudioArguments, MasterA
 class ListAudioSessionsTool(WindowsToolBase, Tool[NoArguments, AudioSessionsResult]):
     name = "list_audio_sessions"
     description = (
-        "List active Windows audio sessions with compact names, processes, IDs, levels, and mute "
-        "state. Use this when a requested application's audio session is uncertain."
+        "List active app audio sessions, levels, and mute state."
     )
     arguments_type = NoArguments
     result_type = AudioSessionsResult
@@ -1017,9 +1009,7 @@ class ControlApplicationAudioTool(
 ):
     name = "control_application_audio"
     description = (
-        "Control a named application's audio session. increase/decrease are relative percentage "
-        "points; set is exact 0-100. A named app means application audio, not master audio. Use "
-        "list_audio_sessions when the target is uncertain."
+        "Control a named app's audio, not master audio; list sessions if uncertain."
     )
     arguments_type = ApplicationAudioArguments
     result_type = ApplicationAudioResult
@@ -1044,8 +1034,7 @@ class ControlApplicationAudioTool(
 class MuteAllAudioExceptTool(WindowsToolBase, Tool[AudioSessionsBatchArguments, AudioBatchResult]):
     name = "mute_all_audio_except"
     description = (
-        "Apply a safe deterministic batch audio operation. mute_all_except mutes every current "
-        "audio session except sessions belonging to the named applications."
+        "Mute every current app audio session except the named apps."
     )
     arguments_type = AudioSessionsBatchArguments
     result_type = AudioBatchResult
@@ -1080,7 +1069,7 @@ class WaitMsTool(Tool[WaitArguments, WaitResult]):
 
 class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
     name = "get_foreground_window"
-    description = "Return the current foreground window from Win32."
+    description = "Return the current foreground window."
     arguments_type = NoArguments
     result_type = WindowResult
     risk_level = RiskLevel.LOW
@@ -1096,8 +1085,7 @@ class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
 class ListOpenWindowsTool(WindowsToolBase, Tool[ListWindowsArguments, WindowsResult]):
     name = "list_open_windows"
     description = (
-        "Live-check open desktop windows, optionally filtered by application/title and monitor. "
-        "Minimized windows are still open and are included."
+        "Live-check desktop windows by app/title or monitor; includes minimized windows."
     )
     arguments_type = ListWindowsArguments
     result_type = WindowsResult
@@ -1167,8 +1155,7 @@ class MoveNamedWindowToMonitorTool(
 ):
     name = "move_named_window_to_monitor"
     description = (
-        "Find one live window, then move it by Windows display position: other, primary, left, "
-        "right, above, below, nearest, previous, monitor number, or exact display device."
+        "Move one open window by monitor relation, number, or display name."
     )
     arguments_type = MoveNamedWindowArguments
     result_type = WindowActionResult
@@ -1241,8 +1228,7 @@ class MoveNamedWindowToMonitorTool(
 class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
     name = "get_monitor_layout"
     description = (
-        "Return the active Windows display topology: monitor numbers, friendly names, physical "
-        "bounds, work areas, primary status, and positions relative to the primary monitor."
+        "Return monitor numbers, names, bounds, primary status, and relative positions."
     )
     arguments_type = NoArguments
     result_type = MonitorsResult
@@ -1258,8 +1244,7 @@ class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
 class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, WindowActionResult]):
     name = "control_named_window"
     description = (
-        "Control a normal desktop window by title or app name. Use for an explicitly requested "
-        "personal/current Chrome window. Managed Chrome/Edge is excluded; use browser_stop for it."
+        "Control a desktop window, including personal Chrome; excludes the managed browser."
     )
     arguments_type = NamedWindowActionArguments
     result_type = WindowActionResult

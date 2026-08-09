@@ -23,7 +23,7 @@ class NoArguments(ToolArguments):
 class WriteClipboardArguments(ToolArguments):
     text: str = Field(
         max_length=100_000,
-        description="The exact text the user explicitly asked to place on the clipboard.",
+        description="Exact text to place on the clipboard.",
     )
 
 
@@ -31,7 +31,7 @@ class FocusedWindowArguments(ToolArguments):
     target_window: str = Field(
         min_length=1,
         max_length=260,
-        description="Expected focused application name or visible window-title text.",
+        description="Expected focused app or window title.",
     )
 
 
@@ -198,8 +198,7 @@ def _make_write_tool() -> CallableTool[WriteClipboardArguments, ClipboardWriteRe
     return CallableTool(
         name="write_clipboard",
         description=(
-            "Replace the clipboard with exact text explicitly supplied by the user. "
-            "Do not use this for highlighted or selected text; use copy_selected_text."
+            "Put exact supplied text on the clipboard; for a selection use copy_selected_text."
         ),
         arguments_type=WriteClipboardArguments,
         result_type=ClipboardWriteResult,
@@ -213,9 +212,7 @@ def _make_copy_selected_tool() -> CallableTool[FocusedWindowArguments, CopySelec
     return CallableTool(
         name="copy_selected_text",
         description=(
-            "Copy the currently highlighted or selected text from the focused Windows "
-            "application by sending Ctrl+C. Use when the user says highlighted text, "
-            "selected text, current selection, or copy this while text is selected."
+            "Copy highlighted text from the focused app; verifies the target window."
         ),
         arguments_type=FocusedWindowArguments,
         result_type=CopySelectedTextResult,
@@ -229,9 +226,7 @@ def _make_paste_tool() -> CallableTool[FocusedWindowArguments, PasteClipboardRes
     return CallableTool(
         name="paste_clipboard",
         description=(
-            "Paste the current clipboard into the focused Windows application by "
-            "sending Ctrl+V. Use when the user asks to paste, paste it, or insert the "
-            "clipboard at the current cursor position."
+            "Paste the clipboard at the cursor in the focused app; verifies the target window."
         ),
         arguments_type=FocusedWindowArguments,
         result_type=PasteClipboardResult,

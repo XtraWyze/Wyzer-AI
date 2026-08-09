@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from wyzer.models import NativeFunctionDefinition, NativeToolDefinition, ToolArguments
+from wyzer.tools.schema import model_parameters
 
 
 class TaskPlanStepInput(BaseModel):
@@ -20,8 +21,7 @@ class CreateTaskPlanArguments(ToolArguments):
         min_length=2,
         max_length=12,
         description=(
-            "The smallest non-overlapping set of outcome steps, normally 2 to 6. Never add "
-            "steps for planning, narration, or final reporting."
+            "Smallest non-overlapping outcome steps, normally 2-6; exclude narration/reporting."
         ),
     )
 
@@ -47,17 +47,13 @@ TASK_ARGUMENT_TYPES: dict[str, type[ToolArguments]] = {
 def task_native_tools() -> list[NativeToolDefinition]:
     descriptions = {
         "task_plan_create": (
-            "Required as the first and only call when a request needs two or more distinct "
-            "computer actions. Silently create the internal plan before any capability call. "
-            "Do not use for conversation or a single routine action."
+            "First and only call for requests needing 2+ distinct computer actions; not for one action."
         ),
         "task_step_update": (
-            "Update the current task step from tool evidence. Mark verified only after a "
-            "successful observation or a tool result explicitly verified the action."
+            "Update the current step from evidence; verified requires observed or explicit success."
         ),
         "task_plan_revise": (
-            "Replace the unfinished portion of the current plan when evidence requires a "
-            "different approach. Preserve already verified steps."
+            "Replace unfinished steps when evidence requires a new approach."
         ),
     }
     return [
@@ -65,7 +61,7 @@ def task_native_tools() -> list[NativeToolDefinition]:
             function=NativeFunctionDefinition(
                 name=name,
                 description=descriptions[name],
-                parameters=arguments_type.model_json_schema(),
+                parameters=model_parameters(arguments_type),
             )
         )
         for name, arguments_type in TASK_ARGUMENT_TYPES.items()
