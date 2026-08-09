@@ -405,6 +405,19 @@ def _managed_browser_processes() -> list[psutil.Process]:
     return matches
 
 
+def managed_browser_process_ids() -> set[int]:
+    """Return the managed browser's root and descendant process identifiers."""
+
+    identifiers: set[int] = set()
+    for root in _managed_browser_processes():
+        identifiers.add(root.pid)
+        try:
+            identifiers.update(child.pid for child in root.children(recursive=True))
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+            continue
+    return identifiers
+
+
 def _terminate_managed_browser_processes() -> None:
     roots = _managed_browser_processes()
     targets: dict[int, psutil.Process] = {}
@@ -792,8 +805,9 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_stop",
                 description=(
-                    "Close Wyzer's managed automation browser and all tabs. Use for close Chrome, "
-                    "close browser, or stop browser automation. Do not use browser_close_tab for this."
+                    "Close Wyzer's managed automation browser and all tabs. Use when the user "
+                    "explicitly refers to Wyzer's managed/automation browser or recent managed-browser "
+                    "work. Do not use this for the user's personal Chrome window."
                 ),
                 arguments_type=NoArguments,
                 result_type=BrowserStatusResult,

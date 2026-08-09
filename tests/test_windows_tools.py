@@ -583,6 +583,42 @@ def test_named_window_close_focuses_and_retries_when_background_close_is_not_ver
     assert backend.windows == []
 
 
+def test_personal_chrome_close_excludes_managed_browser_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import wyzer.tools.browser as browser_module
+
+    backend = FakeWindowsBackend()
+    backend.windows = [
+        WindowInfo(
+            handle=200,
+            title="Managed Chrome",
+            process_id=20,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+        WindowInfo(
+            handle=201,
+            title="Personal Chrome",
+            process_id=21,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+    ]
+    monkeypatch.setattr(browser_module, "managed_browser_process_ids", lambda: {20})
+
+    result = execute(
+        "control_named_window",
+        {"window": "Chrome", "action": "close"},
+        backend,
+    )
+
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data["window_handle"] == 201
+    assert [window.handle for window in backend.windows] == [200]
+
+
 def test_diagnose_system_is_read_only_and_returns_structured_telemetry() -> None:
     backend = FakeWindowsBackend()
 
