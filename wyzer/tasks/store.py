@@ -237,10 +237,9 @@ class TaskStateStore:
 
     def context(self) -> dict[str, object] | None:
         plan = self.snapshot()
-        if plan is None or plan.status in {
-            TaskPlanStatus.COMPLETED,
-            TaskPlanStatus.CANCELLED,
-        }:
+        # Paused and blocked plans remain available to the explicit resume/status
+        # controls, but must not steer an unrelated new conversation after restart.
+        if plan is None or plan.status != TaskPlanStatus.ACTIVE:
             return None
         return plan.model_dump(mode="json")
 
