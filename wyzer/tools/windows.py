@@ -62,6 +62,20 @@ def _prefer_direct_application_windows(windows: list[WindowInfo], query: str) ->
     return wrappers
 
 
+def _exclude_managed_browser_windows(windows: list[WindowInfo]) -> list[WindowInfo]:
+    """Keep desktop window actions away from Wyzer's managed browser profile."""
+
+    browser_processes = {"chrome", "chrome.exe", "edge", "msedge", "msedge.exe"}
+    if not any((window.application or "").casefold() in browser_processes for window in windows):
+        return windows
+
+    # Import lazily so the Windows pack does not require Playwright just to load.
+    from wyzer.tools.browser import managed_browser_process_ids
+
+    managed_ids = managed_browser_process_ids()
+    return [window for window in windows if window.process_id not in managed_ids]
+
+
 class NoArguments(ToolArguments):
     pass
 
@@ -1196,9 +1210,8 @@ class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
 class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, WindowActionResult]):
     name = "control_named_window"
     description = (
-        "Focus, minimize, maximize, restore, or close a normal desktop window by title or app "
-        "name. Do not use this to close Wyzer's managed Chrome/Edge automation browser; use "
-        "browser_stop for that."
+        "Control a normal desktop window by title or app name. Use for an explicitly requested "
+        "personal/current Chrome window. Managed Chrome/Edge is excluded; use browser_stop for it."
     )
     arguments_type = NamedWindowActionArguments
     result_type = WindowActionResult
@@ -1217,6 +1230,7 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
             time.sleep(0.05)
             candidates = self.backend.find_windows(query)
         candidates = _prefer_direct_application_windows(candidates, query)
+        candidates = _exclude_managed_browser_windows(candidates)
         compact_query = "".join(character for character in query if character.isalnum())
         compact_workspace = "".join(
             character for character in Path.cwd().name.casefold() if character.isalnum()

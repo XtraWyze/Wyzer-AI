@@ -84,6 +84,18 @@
     "forbidden_tools": ["control_named_window", "browser_close_tab"]
   },
   {
+    "case_id": "close_personal_chrome",
+    "prompt": "Close my personal Chrome window.",
+    "expected_tools": ["control_named_window"],
+    "forbidden_tools": ["browser_stop", "browser_close_tab"]
+  },
+  {
+    "case_id": "clarify_ambiguous_chrome_close",
+    "prompt": "Close Chrome.",
+    "expected_tools": [],
+    "forbidden_tools": ["browser_stop", "control_named_window", "browser_close_tab"]
+  },
+  {
     "case_id": "inspect_web_page",
     "prompt": "Inspect the current webpage so you can tell me what controls are available.",
     "expected_tools": ["browser_inspect_page"],

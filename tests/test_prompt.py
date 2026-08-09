@@ -19,6 +19,14 @@ def test_system_prompt_is_concise_and_describes_native_tool_behavior() -> None:
     assert "output_schema" not in prompt
 
 
+def test_system_prompt_distinguishes_managed_and_personal_chrome() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "personal Chrome" in prompt
+    assert "use control_named_window" in prompt
+    assert "ask which one" in prompt
+
+
 def test_system_prompt_contains_bounded_recent_application_and_window_context() -> None:
     conversation = ConversationState(
         recently_mentioned_applications=[str(index) for index in range(12)],

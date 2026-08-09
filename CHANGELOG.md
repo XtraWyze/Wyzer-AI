@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.3] - 2026-08-09
+
+### Fixed
+
+- Route explicit personal or current Chrome close requests to the normal desktop window while
+  reserving managed-browser shutdown for Wyzer's automation profile.
+- Ask which Chrome instance to close when a request is ambiguous and has no useful recent context.
+- Exclude Wyzer's managed Chrome or Edge process tree from normal desktop window actions.
+
 ## [0.1.2] - 2026-08-09
 
 ### Fixed
