@@ -487,6 +487,94 @@ def test_list_open_windows_can_live_filter_by_friendly_name() -> None:
     assert result.data["windows"][0]["minimized"] is True
 
 
+def test_window_inventory_hides_wyzer_and_system_shell_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = FakeWindowsBackend()
+    backend.windows.extend(
+        [
+            WindowInfo(
+                handle=101,
+                title="Wyzer",
+                process_id=77,
+                application="python.exe",
+                monitor_id="monitor:1",
+            ),
+            WindowInfo(
+                handle=102,
+                title="Program Manager",
+                process_id=10,
+                application="explorer.exe",
+                monitor_id="monitor:1",
+            ),
+            WindowInfo(
+                handle=103,
+                title="Search",
+                process_id=30,
+                application="SearchHost.exe",
+                monitor_id="monitor:1",
+            ),
+            WindowInfo(
+                handle=104,
+                title="Documents",
+                process_id=10,
+                application="explorer.exe",
+                monitor_id="monitor:1",
+            ),
+        ]
+    )
+    monkeypatch.setattr("wyzer.tools.windows._protected_wyzer_process_ids", lambda: {77})
+
+    result = execute("list_open_windows", {}, backend)
+
+    assert result.ok is True
+    assert result.data is not None
+    assert [window["title"] for window in result.data["windows"]] == ["Notes", "Documents"]
+
+
+@pytest.mark.parametrize("target", ["Wyzer", "Program Manager", "Search"])
+def test_window_control_rejects_wyzer_and_system_shell_windows(
+    target: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = FakeWindowsBackend()
+    protected_process_id = 77
+    backend.windows.extend(
+        [
+            WindowInfo(
+                handle=101,
+                title="Wyzer",
+                process_id=protected_process_id,
+                application="python.exe",
+                monitor_id="monitor:1",
+            ),
+            WindowInfo(
+                handle=102,
+                title="Program Manager",
+                process_id=10,
+                application="explorer.exe",
+                monitor_id="monitor:1",
+            ),
+            WindowInfo(
+                handle=103,
+                title="Search",
+                process_id=30,
+                application="SearchHost.exe",
+                monitor_id="monitor:1",
+            ),
+        ]
+    )
+    monkeypatch.setattr(
+        "wyzer.tools.windows._protected_wyzer_process_ids", lambda: {protected_process_id}
+    )
+
+    result = execute("control_named_window", {"window": target, "action": "minimize"}, backend)
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "WINDOW_NOT_FOUND"
+    assert all(not window.minimized for window in backend.windows)
+
+
 def test_open_application_waits_briefly_for_delayed_window_identity() -> None:
     class DelayedWindowBackend(FakeWindowsBackend):
         def __init__(self) -> None:

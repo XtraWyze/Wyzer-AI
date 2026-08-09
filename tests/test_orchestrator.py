@@ -510,6 +510,51 @@ def test_task_status_and_pause_are_small_local_controls() -> None:
     assert provider.requests == []
 
 
+def test_paused_task_does_not_leak_into_unrelated_conversation() -> None:
+    tasks = TaskStateStore()
+    tasks.create(
+        uuid4(),
+        "Minimize old windows",
+        [
+            {"description": "Minimize Wyzer", "success_criteria": "Wyzer is minimized"},
+            {"description": "Minimize Program Manager", "success_criteria": "Desktop hidden"},
+        ],
+    )
+    tasks.pause()
+    provider = FakeChatProvider([text_response("Not much. What's up with you?")])
+    assistant = build_assistant(ToolRegistry(), provider, tasks=tasks)
+
+    response = asyncio.run(assistant.handle("What's up?"))
+
+    assert response.text == "Not much. What's up with you?"
+    messages = provider.requests[0][0]
+    assert all("TASK_PLAN_JSON=" not in (message.content or "") for message in messages)
+
+
+def test_explicit_resume_restores_paused_task_context() -> None:
+    tasks = TaskStateStore()
+    tasks.create(
+        uuid4(),
+        "Continue organizing files",
+        [
+            {"description": "Find files", "success_criteria": "Files listed"},
+            {"description": "Move files", "success_criteria": "Moves verified"},
+        ],
+    )
+    tasks.pause()
+    provider = FakeChatProvider([text_response("I'll continue the saved task.")])
+    assistant = build_assistant(ToolRegistry(), provider, tasks=tasks)
+
+    asyncio.run(assistant.handle("resume"))
+
+    messages = provider.requests[0][0]
+    task_messages = [
+        message for message in messages if "TASK_PLAN_JSON=" in (message.content or "")
+    ]
+    assert len(task_messages) == 1
+    assert "Continue organizing files" in (task_messages[0].content or "")
+
+
 def test_terminal_chat_accepts_stop_while_action_is_running(
     monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:

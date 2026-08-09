@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import multiprocessing
+import os
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -74,6 +76,49 @@ def _exclude_managed_browser_windows(windows: list[WindowInfo]) -> list[WindowIn
 
     managed_ids = managed_browser_process_ids()
     return [window for window in windows if window.process_id not in managed_ids]
+
+
+_SYSTEM_SHELL_APPLICATIONS = {
+    "dwm.exe",
+    "lockapp.exe",
+    "searchapp.exe",
+    "searchhost.exe",
+    "shellexperiencehost.exe",
+    "sihost.exe",
+    "startmenuexperiencehost.exe",
+    "textinputhost.exe",
+}
+
+
+def _protected_wyzer_process_ids() -> set[int]:
+    """Return the process IDs that own Wyzer and its isolated tool worker."""
+
+    process_ids = {os.getpid()}
+    parent = multiprocessing.parent_process()
+    if parent is not None and parent.pid is not None:
+        process_ids.add(parent.pid)
+    return process_ids
+
+
+def _exclude_non_user_windows(
+    windows: list[WindowInfo], *, protected_process_ids: set[int] | None = None
+) -> list[WindowInfo]:
+    """Hide Wyzer itself and Windows shell infrastructure from window tools."""
+
+    protected = protected_process_ids or _protected_wyzer_process_ids()
+    selected: list[WindowInfo] = []
+    for window in windows:
+        application = (window.application or "").casefold()
+        title = " ".join(window.title.casefold().split())
+        is_program_manager = application in {"", "explorer.exe"} and title == "program manager"
+        if (
+            window.process_id in protected
+            or application in _SYSTEM_SHELL_APPLICATIONS
+            or is_program_manager
+        ):
+            continue
+        selected.append(window)
+    return selected
 
 
 class NoArguments(ToolArguments):
@@ -559,7 +604,7 @@ class IsProcessRunningTool(WindowsToolBase, Tool[ProcessQueryArguments, ProcessR
         assert arguments.name is not None
         requested = arguments.name.strip()
         windows = _prefer_direct_application_windows(
-            self.backend.find_windows(requested), requested
+            _exclude_non_user_windows(self.backend.find_windows(requested)), requested
         )
         identities = {self._compact(requested)}
         try:
@@ -1043,7 +1088,9 @@ class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
 
     def execute(self, arguments: NoArguments, context: ToolContext) -> WindowResult:
         del arguments, context
-        return WindowResult(window=self.backend.foreground_window())
+        foreground = self.backend.foreground_window()
+        visible = _exclude_non_user_windows([foreground]) if foreground is not None else []
+        return WindowResult(window=visible[0] if visible else None)
 
 
 class ListOpenWindowsTool(WindowsToolBase, Tool[ListWindowsArguments, WindowsResult]):
@@ -1061,10 +1108,11 @@ class ListOpenWindowsTool(WindowsToolBase, Tool[ListWindowsArguments, WindowsRes
         del context
         windows = (
             _prefer_direct_application_windows(
-                self.backend.find_windows(arguments.query), arguments.query
+                _exclude_non_user_windows(self.backend.find_windows(arguments.query)),
+                arguments.query,
             )
             if arguments.query is not None
-            else self.backend.list_windows()
+            else _exclude_non_user_windows(self.backend.list_windows())
         )
         selected_monitor: MonitorInfo | None = None
         monitor_number: int | None = None
@@ -1133,10 +1181,10 @@ class MoveNamedWindowToMonitorTool(
         del context
         lookup_timeout = min(1.5, float(getattr(self.backend, "verification_timeout_seconds", 1.5)))
         deadline = time.monotonic() + lookup_timeout
-        matches = self.backend.find_windows(arguments.window)
+        matches = _exclude_non_user_windows(self.backend.find_windows(arguments.window))
         while not matches and time.monotonic() < deadline:
             time.sleep(0.05)
-            matches = self.backend.find_windows(arguments.window)
+            matches = _exclude_non_user_windows(self.backend.find_windows(arguments.window))
         matches = _prefer_direct_application_windows(matches, arguments.window)
         if not matches:
             raise ToolExecutionError(
@@ -1225,10 +1273,10 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
         query = arguments.window.casefold().strip()
         lookup_timeout = min(1.5, float(getattr(self.backend, "verification_timeout_seconds", 1.5)))
         deadline = time.monotonic() + lookup_timeout
-        candidates = self.backend.find_windows(query)
+        candidates = _exclude_non_user_windows(self.backend.find_windows(query))
         while not candidates and time.monotonic() < deadline:
             time.sleep(0.05)
-            candidates = self.backend.find_windows(query)
+            candidates = _exclude_non_user_windows(self.backend.find_windows(query))
         candidates = _prefer_direct_application_windows(candidates, query)
         candidates = _exclude_managed_browser_windows(candidates)
         compact_query = "".join(character for character in query if character.isalnum())
@@ -1237,6 +1285,10 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
         )
         if not candidates and compact_query == compact_workspace:
             foreground = self.backend.foreground_window()
+            foreground_candidates = (
+                _exclude_non_user_windows([foreground]) if foreground is not None else []
+            )
+            foreground = foreground_candidates[0] if foreground_candidates else None
             terminal_apps = {"windowsterminal", "powershell", "pwsh", "cmd", "python"}
             foreground_app = "".join(
                 character

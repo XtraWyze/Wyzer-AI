@@ -63,13 +63,16 @@ def test_completed_plan_requires_every_step_to_be_verified() -> None:
     assert store.context() is None
 
 
-def test_only_unfinished_plan_is_exposed_as_model_context() -> None:
+def test_only_active_plan_is_exposed_as_model_context() -> None:
     store = TaskStateStore()
     store.create(uuid4(), "Keep working", steps())
 
     assert store.context() is not None
 
     store.pause()
+    assert store.context() is None
+
+    store.resume()
     assert store.context() is not None
 
     store.cancel()

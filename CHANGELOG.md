@@ -2,6 +2,22 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.5] - 2026-08-09
+
+### Fixed
+
+- Keep recovered paused or blocked tasks out of unrelated new conversations after restart.
+- Restore saved task context only when the user explicitly resumes the task.
+
+## [0.1.4] - 2026-08-09
+
+### Fixed
+
+- Exclude Wyzer's desktop avatar and chat process from normal window inventory and control
+  actions, including when tools run in an isolated child process.
+- Exclude Windows shell infrastructure such as Program Manager, Search, and desktop-host
+  processes while preserving normal File Explorer windows.
+
 ## [0.1.3] - 2026-08-09
 
 ### Fixed
