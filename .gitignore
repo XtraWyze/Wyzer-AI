@@ -12,4 +12,6 @@ build/
 .env
 logs/
 evidence/
-.wyzer/
+.wyzer/*
+!.wyzer/avatar/
+!.wyzer/avatar/**
