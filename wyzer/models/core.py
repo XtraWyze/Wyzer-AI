@@ -267,21 +267,20 @@ class MonitorDestination(FrozenModel):
     ) = Field(
         default=None,
         description=(
-            "Spatial destination resolved from the live Windows display arrangement. "
-            "Use previous to return this window to its last monitor."
+            "Monitor relation; previous returns the window to its last monitor."
         ),
     )
     number: int | None = Field(
         default=None,
         ge=1,
         le=32,
-        description="Windows display number shown in Display Settings.",
+        description="Windows display number.",
     )
     device_name: str | None = Field(
         default=None,
         min_length=1,
         max_length=128,
-        description="Exact active Windows display device or friendly monitor name.",
+        description="Display device or friendly monitor name.",
     )
 
     @model_validator(mode="after")

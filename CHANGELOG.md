@@ -2,6 +2,22 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.6] - 2026-08-09
+
+### Added
+
+- Add `python -m wyzer.dev.measure_context` for reproducible system-prompt and native-tool
+  schema measurements, including per-tool and per-pack breakdowns.
+- Add semantic schema regression coverage for tool names, arguments, JSON types, required
+  fields, enum values, defaults, and validation constraints.
+
+### Changed
+
+- Reduce empty-state model-facing context from approximately 35,168 to 24,778 characters
+  (29.5%) by compressing duplicated prompt/schema prose and omitting display-only schema titles.
+- Preserve all 48 model-visible capability tools, three task-engine tools, native structured
+  calling, validation, safety, perception, desktop typing, diagnostics, and LLM-driven routing.
+
 ## [0.1.5] - 2026-08-09
 
 ### Fixed

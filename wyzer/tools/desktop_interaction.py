@@ -24,10 +24,10 @@ class InspectDesktopArguments(ToolArguments):
         default=None,
         min_length=1,
         max_length=160,
-        description="Optional visible label or control type to filter for, such as Save, search box, button, or edit.",
+        description="Visible label or control type filter.",
     )
     limit: int = Field(
-        default=40, ge=1, le=100, description="Maximum number of useful controls to return."
+        default=40, ge=1, le=100, description="Maximum controls to return."
     )
 
 
@@ -35,7 +35,7 @@ class ClickDesktopElementArguments(ToolArguments):
     element_id: str = Field(
         min_length=8,
         max_length=4096,
-        description="Opaque element_id returned by inspect_desktop_ui. Never invent this value.",
+        description="element_id from inspect_desktop_ui.",
     )
 
 
@@ -43,12 +43,12 @@ class TypeDesktopTextArguments(ToolArguments):
     text: str = Field(
         min_length=1,
         max_length=10000,
-        description="Literal text to type into the currently focused desktop control.",
+        description="Literal text to type into the focused control.",
     )
     target_window: str = Field(
         min_length=1,
         max_length=260,
-        description="Expected focused application name or visible window-title text.",
+        description="Expected focused app or window title.",
     )
 
 
@@ -75,12 +75,12 @@ class PressDesktopKeyArguments(ToolArguments):
         "ctrl_z",
         "ctrl_y",
         "alt_f4",
-    ] = Field(description="Keyboard key or shortcut to send to the focused desktop application.")
-    presses: int = Field(default=1, ge=1, le=20, description="How many times to press the key.")
+    ] = Field(description="Key or shortcut.")
+    presses: int = Field(default=1, ge=1, le=20, description="Number of presses.")
     target_window: str = Field(
         min_length=1,
         max_length=260,
-        description="Expected focused application name or visible window-title text.",
+        description="Expected focused app or window title.",
     )
 
 
@@ -481,8 +481,7 @@ class ClickDesktopElementTool(_DesktopTool):
 class TypeDesktopTextTool(_DesktopTool):
     name = "type_desktop_text"
     description = (
-        "Type literal text into the focused control only after verifying that the expected "
-        "Windows application is still focused."
+        "Type literal text into a focused desktop control; verifies the target window."
     )
     arguments_type = TypeDesktopTextArguments
     result_type = DesktopActionResult
@@ -501,8 +500,7 @@ class TypeDesktopTextTool(_DesktopTool):
 class PressDesktopKeyTool(_DesktopTool):
     name = "press_desktop_key"
     description = (
-        "Press a common key or shortcut only after verifying that the expected Windows "
-        "application is still focused."
+        "Press a key or shortcut in a focused desktop app; verifies the target window."
     )
     arguments_type = PressDesktopKeyArguments
     result_type = DesktopActionResult

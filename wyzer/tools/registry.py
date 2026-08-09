@@ -15,6 +15,7 @@ from wyzer.models import (
     ToolDefinition,
 )
 from wyzer.tools.base import Tool
+from wyzer.tools.schema import model_parameters
 
 if TYPE_CHECKING:
     from wyzer.tools.packs import ToolPack
@@ -169,7 +170,7 @@ class ToolRegistry:
                 function=NativeFunctionDefinition(
                     name=definition.name,
                     description=definition.description,
-                    parameters=definition.arguments_schema,
+                    parameters=model_parameters(self._tools[definition.name].arguments_type),
                 )
             )
             for definition in self.definitions()

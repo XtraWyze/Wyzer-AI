@@ -31,11 +31,7 @@ class DiagnoseSystemArguments(ToolArguments):
     scope: DiagnosticScope = Field(
         default="auto",
         description=(
-            "Diagnostic area. Use auto for a broad health snapshot; performance for CPU/RAM/GPU/"
-            "process load; hardware for CPU/GPU/battery/firmware; storage for disks and space; "
-            "network for adapters/connectivity; windows for services/devices/recent serious "
-            "events; "
-            "security for Defender and firewall state."
+            "Area to inspect; auto gives a broad health snapshot."
         ),
     )
 
@@ -62,8 +58,7 @@ class DiagnoseSystemResult(BaseModel):
 class DiagnoseSystemTool(Tool[DiagnoseSystemArguments, DiagnoseSystemResult]):
     name = "diagnose_system"
     description = (
-        "Inspect current Windows health and telemetry: CPU, RAM, GPU/VRAM, disks, network, "
-        "processes, devices, services, serious events, Defender, and firewall. Read-only."
+        "Inspect Windows performance, hardware, storage, network, services, and security health."
     )
     arguments_type = DiagnoseSystemArguments
     result_type = DiagnoseSystemResult

@@ -1,0 +1,125 @@
+"""Regression coverage for the semantic model-facing tool API."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+from wyzer.tasks.tools import TASK_ARGUMENT_TYPES, task_native_tools
+from wyzer.tools import create_default_registry
+
+EXPECTED_MODEL_TOOL_NAMES = {
+    "activate_visual_target",
+    "browser_click",
+    "browser_close_tab",
+    "browser_history",
+    "browser_inspect_page",
+    "browser_list_tabs",
+    "browser_open_url",
+    "browser_press_key",
+    "browser_scroll",
+    "browser_search_web",
+    "browser_stop",
+    "browser_switch_tab",
+    "browser_type_text",
+    "control_application_audio",
+    "control_master_audio",
+    "control_media",
+    "control_named_window",
+    "copy_path",
+    "copy_selected_text",
+    "create_directory",
+    "delete_path",
+    "diagnose_system",
+    "get_current_media",
+    "get_foreground_window",
+    "get_monitor_layout",
+    "get_system_profile",
+    "inspect_screen",
+    "is_process_running",
+    "list_audio_sessions",
+    "list_directory",
+    "list_installed_games",
+    "list_open_windows",
+    "move_named_window_to_monitor",
+    "move_path",
+    "mute_all_audio_except",
+    "open_application",
+    "open_file",
+    "open_indexed_folder",
+    "paste_clipboard",
+    "press_desktop_key",
+    "read_clipboard",
+    "read_text_file",
+    "refresh_file_index",
+    "rename_path",
+    "search_files",
+    "search_installed_applications",
+    "task_plan_create",
+    "task_plan_revise",
+    "task_step_update",
+    "type_desktop_text",
+    "write_clipboard",
+}
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = (
+    "bb559bded12f44eeeea5a32c7a96fbac006a240ef2cbf33bd3e722b0a03928fe"
+)
+
+
+def _semantic_schema(value: Any) -> Any:
+    """Remove prose-only keys while retaining every API/validation constraint."""
+
+    if isinstance(value, dict):
+        return {
+            key: _semantic_schema(item)
+            for key, item in sorted(value.items())
+            if key not in {"description", "title"}
+        }
+    if isinstance(value, list):
+        return [_semantic_schema(item) for item in value]
+    return value
+
+
+def _contains_key(value: Any, key: str) -> bool:
+    if isinstance(value, dict):
+        return key in value or any(_contains_key(item, key) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_key(item, key) for item in value)
+    return False
+
+
+def test_model_tool_names_and_semantic_argument_contracts_are_stable() -> None:
+    registry = create_default_registry()
+    schemas = {
+        definition.name: _semantic_schema(definition.arguments_schema)
+        for definition in registry.definitions()
+        if registry.get(definition.name, require_available=False).llm_visible
+    }
+    schemas.update(
+        {
+            name: _semantic_schema(arguments_type.model_json_schema())
+            for name, arguments_type in TASK_ARGUMENT_TYPES.items()
+        }
+    )
+
+    assert set(schemas) == EXPECTED_MODEL_TOOL_NAMES
+    serialized = json.dumps(schemas, sort_keys=True, separators=(",", ":"))
+    assert hashlib.sha256(serialized.encode()).hexdigest() == EXPECTED_SEMANTIC_SCHEMA_SHA256
+
+
+def test_native_tool_schemas_are_json_valid_and_omit_only_display_titles() -> None:
+    registry = create_default_registry()
+    tools = [*registry.native_tools(), *task_native_tools()]
+    expected_available_names = {
+        definition.name
+        for definition in registry.definitions()
+        if definition.available
+        and registry.get(definition.name, require_available=False).llm_visible
+    } | set(TASK_ARGUMENT_TYPES)
+
+    assert {tool.function.name for tool in tools} == expected_available_names
+    for tool in tools:
+        json.dumps(tool.model_dump(mode="json"))
+        assert not _contains_key(tool.function.parameters, "title")
+        assert tool.function.parameters.get("type") == "object"

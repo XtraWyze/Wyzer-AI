@@ -47,12 +47,12 @@ class NoArguments(ToolArguments):
 class BrowserStartArguments(ToolArguments):
     browser: Literal["auto", "edge", "chrome"] = Field(
         default="chrome",
-        description="Which installed Chromium browser to launch. Auto prefers Chrome.",
+        description="Browser to launch; auto prefers Chrome.",
     )
     initial_url: str = Field(
         default="about:blank",
         max_length=2048,
-        description="Optional initial http, https, or about URL.",
+        description="Initial http, https, or about URL.",
     )
 
     @field_validator("initial_url")
@@ -62,8 +62,8 @@ class BrowserStartArguments(ToolArguments):
 
 
 class OpenUrlArguments(ToolArguments):
-    url: str = Field(max_length=2048, description="Exact http, https, or about URL to open.")
-    new_tab: bool = Field(default=False, description="Open the URL in a new tab.")
+    url: str = Field(max_length=2048, description="http, https, or about URL.")
+    new_tab: bool = Field(default=False, description="Open in a new tab.")
 
     @field_validator("url")
     @classmethod
@@ -72,7 +72,7 @@ class OpenUrlArguments(ToolArguments):
 
 
 class SearchWebArguments(ToolArguments):
-    query: str = Field(min_length=1, max_length=500, description="The user's web search query.")
+    query: str = Field(min_length=1, max_length=500, description="Web search query.")
     engine: Literal["bing", "google", "duckduckgo"] = "google"
     new_tab: bool = False
 
@@ -85,12 +85,12 @@ class InspectPageArguments(ToolArguments):
 class ElementRefArguments(ToolArguments):
     ref: str = Field(
         pattern=r"^e[1-9][0-9]*$",
-        description="Element reference returned by browser_inspect_page, such as e3.",
+        description="Ref from browser_inspect_page, e.g. e3.",
     )
 
 
 class TypeTextArguments(ElementRefArguments):
-    text: str = Field(max_length=20_000, description="Exact text to enter into the target field.")
+    text: str = Field(max_length=20_000, description="Exact text to enter.")
     clear_first: bool = True
     submit: bool = Field(default=False, description="Press Enter after typing.")
 
@@ -99,7 +99,7 @@ class PressKeyArguments(ToolArguments):
     key: str = Field(
         min_length=1,
         max_length=50,
-        description="Playwright key name such as Enter, Escape, Tab, ArrowDown, or Control+L.",
+        description="Key, e.g. Enter, Escape, Tab, ArrowDown, or Control+L.",
     )
 
 
@@ -122,7 +122,7 @@ class CloseTabArguments(ToolArguments):
     index: int | None = Field(
         default=None,
         ge=1,
-        description="One-based tab index. Omit to close the active tab.",
+        description="Tab index; omit for the active tab.",
     )
 
 
@@ -805,9 +805,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_stop",
                 description=(
-                    "Close Wyzer's managed automation browser and all tabs. Use when the user "
-                    "explicitly refers to Wyzer's managed/automation browser or recent managed-browser "
-                    "work. Do not use this for the user's personal Chrome window."
+                    "Close Wyzer's managed browser and all its tabs, not personal Chrome."
                 ),
                 arguments_type=NoArguments,
                 result_type=BrowserStatusResult,
@@ -828,8 +826,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_open_url",
                 description=(
-                    "Open an exact web URL in managed Chrome, starting it automatically if needed, "
-                    "optionally in a new tab."
+                    "Open an exact URL in managed Chrome; starts it automatically."
                 ),
                 arguments_type=OpenUrlArguments,
                 result_type=BrowserActionResult,
@@ -840,8 +837,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_search_web",
                 description=(
-                    "Search the web directly in managed Chrome, starting it automatically if needed. "
-                    "Use this instead of opening Chrome as a desktop application or typing into its address bar."
+                    "Search the web in managed Chrome; starts it automatically."
                 ),
                 arguments_type=SearchWebArguments,
                 result_type=BrowserActionResult,
@@ -852,8 +848,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_inspect_page",
                 description=(
-                    "Read the active page's visible text and interactive elements. Returns refs such as e1 "
-                    "for browser_click and browser_type_text. Always inspect before interacting with a page."
+                    "Read the active page and return element refs for later interaction."
                 ),
                 arguments_type=InspectPageArguments,
                 result_type=PageInspectionResult,
@@ -864,8 +859,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_click",
                 description=(
-                    "Click one element ref from the latest browser_inspect_page result. Inspect again after "
-                    "navigation or major page changes."
+                    "Click a ref from the latest browser_inspect_page result."
                 ),
                 arguments_type=ElementRefArguments,
                 result_type=BrowserActionResult,
@@ -877,8 +871,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_type_text",
                 description=(
-                    "Enter exact text into a textbox ref from browser_inspect_page, optionally clearing it "
-                    "and pressing Enter. Do not use for passwords unless the user explicitly provided one."
+                    "Enter exact text into a browser_inspect_page field ref; can clear or submit."
                 ),
                 arguments_type=TypeTextArguments,
                 result_type=BrowserActionResult,
@@ -916,7 +909,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_list_tabs",
-                description="List managed-browser tabs with one-based indexes, titles, URLs, and active state.",
+                description="List managed-browser tabs and their indexes, titles, URLs, and active state.",
                 arguments_type=NoArguments,
                 result_type=TabListResult,
                 handler=_list_tabs,
@@ -935,8 +928,7 @@ def create_browser_pack() -> SimpleToolPack:
             lambda: _tool(
                 name="browser_close_tab",
                 description=(
-                    "Close one tab only: the active tab or a tab index returned by browser_list_tabs. "
-                    "Never use this to close Chrome or the whole managed browser; use browser_stop instead."
+                    "Close one managed-browser tab, not the entire browser."
                 ),
                 arguments_type=CloseTabArguments,
                 result_type=BrowserActionResult,
