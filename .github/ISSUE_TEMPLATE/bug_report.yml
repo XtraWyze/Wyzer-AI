@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible Wyzer problem.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include API keys, personal files, private screenshots, or other sensitive data."
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Tell us what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start Wyzer...
+        2. Ask it to...
+        3. See error...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Wyzer version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant console output
+      description: Remove private details before pasting.

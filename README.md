@@ -1,5 +1,18 @@
 # Wyzer
 
+[![CI](https://github.com/XtraWyze/Wyzer-Ai/actions/workflows/ci.yml/badge.svg)](https://github.com/XtraWyze/Wyzer-Ai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> A local Windows AI desktop assistant with voice control, a custom animated character, wake-word
+> support, text-to-speech, speech recognition, and Ollama-powered local AI.
+
+## Download
+
+For the simplest Windows installation, download the latest `Wyzer-Setup.zip` from
+[Releases](https://github.com/XtraWyze/Wyzer-Ai/releases/latest), extract it, and follow its
+`README.txt`. The installer uses a private Python environment and does not modify global Python
+packages.
+
 Wyzer is a local, LLM-first Windows desktop assistant. It uses native model tool calling for
 desktop actions while keeping every effect behind a typed, registered, deterministic tool.
 

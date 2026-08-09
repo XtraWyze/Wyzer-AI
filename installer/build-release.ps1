@@ -31,7 +31,12 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install.ps1") -Destination $res
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "constraints-windows-py311.txt") -Destination $resolvedOutput -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "RELEASE_README.txt") -Destination (Join-Path $resolvedOutput "README.txt") -Force
 Copy-Item -LiteralPath (Join-Path $sourceRoot "wyzer.toml") -Destination $resolvedOutput -Force
-Copy-Item -Path (Join-Path $sourceRoot ".wyzer\avatar\*") -Destination (Join-Path $resolvedOutput "assets\avatar") -Force
+$avatarSource = Join-Path $sourceRoot ".wyzer\avatar"
+if (Test-Path -LiteralPath $avatarSource) {
+    Copy-Item -Path (Join-Path $avatarSource "*") -Destination (Join-Path $resolvedOutput "assets\avatar") -Force
+} else {
+    Write-Warning "No custom avatar frames found. The installer will use Wyzer's built-in mascot."
+}
 Copy-Item -Path (Join-Path $sourceRoot "openwakemodels\*") -Destination (Join-Path $resolvedOutput "assets\wake-models") -Force
 
 $zipPath = Join-Path (Split-Path -Parent $resolvedOutput) "Wyzer-Setup.zip"
