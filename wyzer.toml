@@ -1,0 +1,76 @@
+worker_isolation_enabled = true
+tool_worker_count = 2
+tool_timeout_seconds = 15
+maximum_tool_rounds = 12
+confirmation_ttl_seconds = 120
+tool_result_context_characters = 4000
+
+[task_engine]
+enabled = true
+state_path = ".wyzer/task-state.json"
+maximum_steps = 12
+maximum_retries_per_step = 2
+
+[audio]
+default_master_volume_step = 10
+default_application_volume_step = 10
+application_audio_match_threshold = 0.72
+application_audio_ambiguity_margin = 0.08
+control_all_matching_sessions = true
+core_audio_timeout_seconds = 5
+
+[perception]
+enabled = true
+max_image_dimension = 1600
+vision_timeout_seconds = 45
+visual_click_min_confidence = 0.70
+
+[llm]
+provider = "ollama"
+model = "qwen3.5:4b"
+endpoint = "http://127.0.0.1:11434"
+temperature = 0.1
+think = false
+max_output_tokens = 256
+detailed_output_tokens = 1024
+request_timeout_seconds = 60
+auto_start = true
+startup_timeout_seconds = 10
+keep_alive = "30m"
+
+[personality]
+assistant_name = "Wyzer"
+tone = "calm, matter-of-fact, and direct"
+response_length = "concise"
+humor_level = 0
+proactivity_level = 0
+narrate_before_actions = false
+summarize_completed_actions = true
+
+[speech]
+enabled = false
+stt_adapter = "faster_whisper"
+tts_adapter = "kokoro"
+wake_word_adapter = "openwakeword"
+wake_model_directory = "openwakemodels"
+wake_model = "hey_Wyzer.onnx"
+wake_phrase = "hey wyzer"
+listen_timeout_seconds = 8
+wake_timeout_seconds = 30
+minimum_stt_confidence = 0.35
+whisper_model = "small.en"
+whisper_device = "cpu"
+whisper_compute_type = "int8"
+whisper_download_root = ".wyzer/models"
+minimum_wake_confidence = 0.55
+rate = 0
+volume = 100
+
+voice = "af_heart"
+tts_speed = 1.08
+tts_device = "auto"
+
+[tool_packs]
+# Optional third-party entry-point packs only. Browser, clipboard, and desktop
+# interaction are built into Wyzer and must not be listed here.
+enabled = []

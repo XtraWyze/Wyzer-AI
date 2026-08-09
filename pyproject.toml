@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wyzer"
+version = "0.1.0"
+description = "A local, verifiable Windows desktop assistant"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = {text = "MIT"}
+dependencies = [
+  "pydantic>=2.8,<3",
+  "psutil>=6,<8",
+  "playwright>=1.45,<2",
+  "pyperclip>=1.9,<2",
+  "send2trash>=1.8,<2",
+  "pywinauto>=0.6.8,<1",
+  "pillow>=10,<13",
+  "winrt-Windows.Media.Control>=3,<4",
+  "winrt-Windows.Foundation>=3,<4",
+  "numpy>=1.26,<3",
+  "openwakeword>=0.6,<1",
+  "sounddevice>=0.5,<1",
+  "faster-whisper>=1.2,<2",
+  "kokoro>=0.9,<1",
+]
+
+[project.optional-dependencies]
+audio = [
+  "comtypes>=1.4,<2",
+  "pycaw>=20240210,<20260000",
+]
+ui = [
+  "PySide6>=6.6,<7",
+]
+dev = [
+  "mypy>=1.11",
+  "pytest>=8.3",
+  "pytest-cov>=5",
+  "ruff>=0.6",
+  "types-psutil>=6",
+]
+
+[project.scripts]
+wyzer = "wyzer.app.cli:main"
+wyzer-audio-diagnostic = "wyzer.audio_diagnostic:main"
+wyzer-install-check = "wyzer.install_check:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["wyzer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "windows_integration: safe tests against the real Windows desktop backend",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["wyzer", "tests"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["wyzer.ui.*", "wyzer.app.cli"]
+disable_error_code = [
+  "attr-defined",
+  "no-untyped-call",
+  "no-untyped-def",
+  "assignment",
+  "union-attr",
+]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["arg-type", "attr-defined", "no-untyped-def"]

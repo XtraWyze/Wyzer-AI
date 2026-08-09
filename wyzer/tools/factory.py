@@ -1,0 +1,41 @@
+"""Authoritative application tool-registry composition."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from wyzer.desktop.system import WindowsSystemBackend
+from wyzer.desktop.windows_backend import CtypesWindowsBackend
+from wyzer.files import FileCatalog
+from wyzer.tools.builtin_packs import create_builtin_packs
+from wyzer.tools.discovery import load_enabled_tool_packs
+from wyzer.tools.files import FileToolPack
+from wyzer.tools.packs import ToolPackFactory
+from wyzer.tools.registry import ToolRegistry
+
+
+def create_default_registry(
+    backend: WindowsSystemBackend | None = None,
+    *,
+    audio_options: dict[str, object] | None = None,
+    perception_options: dict[str, object] | None = None,
+    enabled_entrypoint_packs: Sequence[str] = (),
+    extra_pack_factories: Sequence[ToolPackFactory] = (),
+) -> ToolRegistry:
+    """Build a fresh registry for the main process or an isolated worker.
+
+    The built-in desktop capabilities are split into focused packs. Installed
+    entry-point packs are never loaded automatically; each name must be
+    explicitly enabled in configuration.
+    """
+
+    backend = backend or CtypesWindowsBackend(audio_options=audio_options)
+    registry = ToolRegistry()
+    for pack in create_builtin_packs(backend, perception_options):
+        registry.register_pack(pack)
+    registry.register_pack(FileToolPack(FileCatalog(), backend))
+    for pack_factory in extra_pack_factories:
+        registry.register_pack(pack_factory())
+    for pack in load_enabled_tool_packs(tuple(enabled_entrypoint_packs)):
+        registry.register_pack(pack)
+    return registry

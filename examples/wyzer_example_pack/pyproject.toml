@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wyzer-example-pack-do-not-install"
+version = "0.0.0"
+description = "Non-functional documentation template for a Wyzer external tool pack"
+requires-python = ">=3.11"
+dependencies = []
+
+# Intentionally omitted: [project.entry-points."wyzer.tool_packs"]
+# This example is documentation only and cannot be discovered by Wyzer.
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wyzer_example_pack"]
