@@ -21,6 +21,7 @@ REQUIRED_MODULES = (
     "faster_whisper",
     "openwakeword",
     "kokoro",
+    "torch",
 )
 OPENWAKEWORD_SUPPORT_MODELS = ("melspectrogram.onnx", "embedding_model.onnx")
 
@@ -89,6 +90,26 @@ def _download_openwakeword_support_models() -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _torch_details() -> dict[str, object]:
+    details: dict[str, object] = {
+        "version": None,
+        "cuda_build": None,
+        "cuda_available": False,
+        "device_count": 0,
+    }
+    try:
+        torch = importlib.import_module("torch")
+        details = {
+            "version": str(getattr(torch, "__version__", "unknown")),
+            "cuda_build": getattr(getattr(torch, "version", None), "cuda", None),
+            "cuda_available": bool(torch.cuda.is_available()),
+            "device_count": int(torch.cuda.device_count()),
+        }
+    except Exception as error:
+        details["error"] = str(error)
+    return details
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Check whether Wyzer is ready to run")
     parser.add_argument("--download-model", action="store_true")
@@ -125,6 +146,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     avatar_frames = list((data_home() / "avatar").glob("*.png")) + list(
         (data_home() / "avatar").glob("*.webp")
     )
+    torch_details = _torch_details()
+    if settings.speech.tts_device == "cuda" and not torch_details["cuda_available"]:
+        failures.append("Text-to-speech is configured for CUDA, but PyTorch cannot use CUDA")
     if not wake_models:
         failures.append("No wake-word ONNX model was installed")
     if missing_wake_support and not args.allow_missing_model:
@@ -149,6 +173,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "wake_models": len(wake_models),
         "openwakeword_support_models_ready": not missing_wake_support,
         "whisper_model_ready": whisper_ready,
+        "torch": torch_details,
         "failures": failures,
     }
     print(json.dumps(result, indent=2))

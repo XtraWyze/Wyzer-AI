@@ -2,6 +2,16 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.2] - 2026-08-09
+
+### Fixed
+
+- Detect NVIDIA GPUs during Windows installation and install the official CUDA 12.1 PyTorch wheel
+  instead of leaving Kokoro TTS on the CPU-only PyTorch build.
+- Report the installed PyTorch version, CUDA runtime, availability, and device count in the
+  installer readiness check.
+- Add `-TorchDevice auto|cuda|cpu` installer control for automatic detection or an explicit build.
+
 ## [0.1.1] - 2026-08-09
 
 ### Added

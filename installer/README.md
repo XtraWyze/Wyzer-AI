@@ -21,4 +21,8 @@ Faster-Whisper model and OpenWakeWord's required preprocessing models. Pass `-Sk
 only when preparing an offline installation; voice recognition will not work until those models
 are installed.
 
+The installer automatically detects NVIDIA GPUs and installs the CUDA 12.1 PyTorch build used by
+Kokoro TTS. Use `-TorchDevice cpu` to force the smaller CPU build or `-TorchDevice cuda` to require
+CUDA and fail installation if it cannot be initialized.
+
 Reinstalling preserves the installed `wyzer.toml`, avatar frames, models, memory, and task state.
