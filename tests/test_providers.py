@@ -124,7 +124,9 @@ def test_ollama_uses_native_tools_without_execution_plan_format() -> None:
 
 
 def test_ollama_caps_generated_tokens() -> None:
-    transport = FakeTransport([JsonResponse(200, {"message": {"role": "assistant", "content": "Hi."}})])
+    transport = FakeTransport(
+        [JsonResponse(200, {"message": {"role": "assistant", "content": "Hi."}})]
+    )
     provider = OllamaChatProvider(
         "http://127.0.0.1:11434", "test", max_output_tokens=96, transport=transport
     )

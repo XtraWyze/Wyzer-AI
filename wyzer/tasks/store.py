@@ -237,7 +237,12 @@ class TaskStateStore:
 
     def context(self) -> dict[str, object] | None:
         plan = self.snapshot()
-        return plan.model_dump(mode="json") if plan is not None else None
+        if plan is None or plan.status in {
+            TaskPlanStatus.COMPLETED,
+            TaskPlanStatus.CANCELLED,
+        }:
+            return None
+        return plan.model_dump(mode="json")
 
     def _set_plan_status(self, status: TaskPlanStatus) -> TaskPlan:
         with self._lock:

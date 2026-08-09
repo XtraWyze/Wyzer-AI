@@ -47,8 +47,9 @@ TASK_ARGUMENT_TYPES: dict[str, type[ToolArguments]] = {
 def task_native_tools() -> list[NativeToolDefinition]:
     descriptions = {
         "task_plan_create": (
-            "Silently create an internal plan for a request requiring two or more distinct "
-            "computer actions. Do not use for conversation or a single routine action."
+            "Required as the first and only call when a request needs two or more distinct "
+            "computer actions. Silently create the internal plan before any capability call. "
+            "Do not use for conversation or a single routine action."
         ),
         "task_step_update": (
             "Update the current task step from tool evidence. Mark verified only after a "

@@ -55,8 +55,16 @@ def test_system_prompt_requires_live_rechecks_without_dumping_broad_window_state
 
     assert '"observed_open_windows"' not in prompt
     assert "A minimized window is still open" in prompt
+    assert "never substitute is_process_running" in prompt
     assert "perform the action directly" in prompt
     assert "do not add a preliminary status check" in prompt
+
+
+def test_system_prompt_requires_planning_before_multiple_capabilities() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "first response must contain only task_plan_create" in prompt
+    assert "Never batch capability calls before that plan exists" in prompt
 
 
 def test_system_prompt_replaces_raw_monitor_id_with_friendly_label() -> None:

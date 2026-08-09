@@ -46,6 +46,27 @@ class FailingTool(EchoTool):
         raise RuntimeError("expected failure")
 
 
+class VerifiedActionData(BaseModel):
+    changed: bool = True
+    evidence: dict[str, str] = {
+        "verification_status": "verified",
+        "predicate": "requested_action_observed",
+    }
+
+
+class VerifiedActionTool(Tool[EchoArguments, VerifiedActionData]):
+    name = "verified_action"
+    description = "Perform a deterministic action with explicit verification evidence."
+    arguments_type = EchoArguments
+    result_type = VerifiedActionData
+    risk_level = RiskLevel.LOW
+    read_only = False
+
+    def execute(self, arguments: EchoArguments, context: ToolContext) -> VerifiedActionData:
+        del arguments, context
+        return VerifiedActionData()
+
+
 class ApplicationArguments(ToolArguments):
     application: str
 

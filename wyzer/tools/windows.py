@@ -486,9 +486,9 @@ class GetSystemProfileTool(WindowsToolBase, Tool[NoArguments, SystemProfileResul
 class IsProcessRunningTool(WindowsToolBase, Tool[ProcessQueryArguments, ProcessRunningResult]):
     name = "is_process_running"
     description = (
-        "Check whether an application or process is currently present. Friendly application "
-        "names are allowed; open and minimized windows count as running, and a process with no "
-        "window is reported as background."
+        "Check whether a named background process is currently running, including processes with "
+        "no desktop window. Use list_open_windows instead when the user asks whether an "
+        "application or window is open."
     )
     arguments_type = ProcessQueryArguments
     result_type = ProcessRunningResult
