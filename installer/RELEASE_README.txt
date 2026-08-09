@@ -60,5 +60,6 @@ Wyzer preserves those files.
 Important
 ---------
 - Wyzer does not change the computer's global Python packages.
+- On computers with an NVIDIA GPU, the installer adds CUDA-enabled PyTorch to Wyzer's private environment.
 - Do not delete the %LOCALAPPDATA%\Wyzer folder unless you want to remove Wyzer's
   local settings, avatars, downloaded models, memory, and task history.

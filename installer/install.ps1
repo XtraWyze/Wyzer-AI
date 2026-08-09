@@ -2,7 +2,9 @@
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Wyzer"),
     [switch]$SkipModelDownload,
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    [ValidateSet("auto", "cuda", "cpu")]
+    [string]$TorchDevice = "auto"
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +37,18 @@ function Copy-NewFiles([string]$Source, [string]$Destination) {
             Copy-Item -LiteralPath $_.FullName -Destination $target
         }
     }
+}
+
+function Test-NvidiaGpu {
+    $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+    if ($null -eq $nvidiaSmi) { return $false }
+    & $nvidiaSmi.Source --query-gpu=name --format=csv,noheader 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
+}
+
+function Test-CudaTorch([string]$PythonExecutable) {
+    & $PythonExecutable -c "import torch; raise SystemExit(0 if torch.version.cuda and torch.cuda.is_available() else 1)" 2>$null
+    return $LASTEXITCODE -eq 0
 }
 
 $scriptDirectory = $PSScriptRoot
@@ -80,6 +94,25 @@ Write-Host "Installing the tested Wyzer dependency set..."
 if ($LASTEXITCODE -ne 0) { throw "Could not update the installer tools." }
 & $venvPython -m pip install --constraint $constraints "$packageSource[audio,ui]"
 if ($LASTEXITCODE -ne 0) { throw "Wyzer or one of its dependencies could not be installed." }
+
+$cudaRequested = $TorchDevice -eq "cuda" -or ($TorchDevice -eq "auto" -and (Test-NvidiaGpu))
+if ($cudaRequested) {
+    if (-not (Test-CudaTorch $venvPython)) {
+        Write-Host "NVIDIA GPU detected. Installing CUDA-enabled PyTorch..."
+        & $venvPython -m pip install --upgrade --force-reinstall "torch==2.3.1" --index-url "https://download.pytorch.org/whl/cu121"
+        if ($LASTEXITCODE -ne 0) { throw "Could not install CUDA-enabled PyTorch." }
+        if (-not (Test-CudaTorch $venvPython)) {
+            throw "CUDA-enabled PyTorch was installed, but CUDA is still unavailable. Check the NVIDIA driver."
+        }
+    }
+    Write-Host "CUDA-enabled PyTorch is ready."
+} elseif ($TorchDevice -eq "auto") {
+    Write-Host "No NVIDIA GPU was detected. Keeping the CPU PyTorch build."
+} elseif (Test-CudaTorch $venvPython) {
+    Write-Host "Replacing CUDA-enabled PyTorch with the requested CPU build..."
+    & $venvPython -m pip install --upgrade --force-reinstall "torch==2.3.1" --index-url "https://download.pytorch.org/whl/cpu"
+    if ($LASTEXITCODE -ne 0) { throw "Could not install the CPU PyTorch build." }
+}
 
 $configTarget = Join-Path $InstallRoot "wyzer.toml"
 if (-not (Test-Path -LiteralPath $configTarget)) {
