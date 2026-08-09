@@ -276,8 +276,21 @@ class Orchestrator:
                         content="Return a brief answer or a valid native tool call now.",
                     )
                 )
+            plan_completed = self._completed_plan_for(action_id)
+            if plan_completed:
+                messages.append(
+                    ChatMessage(
+                        role="system",
+                        content=(
+                            "All planned steps are verified. Return one concise final answer now. "
+                            "No more tools are available or needed."
+                        ),
+                    )
+                )
             try:
-                provider_response = await self._request_provider(messages)
+                provider_response = await self._request_provider(
+                    messages, include_tools=not plan_completed
+                )
             except asyncio.CancelledError:
                 if self._is_interrupted(action_id):
                     return self._interrupted_response(action_id)
@@ -289,6 +302,12 @@ class Orchestrator:
                     )
                 )
             message = self._repair_window_tool_calls(provider_response.message)
+            if plan_completed and message.tool_calls:
+                return self._finish_response(
+                    AssistantResponse(
+                        text=self._completed_plan_response(action_id), action_id=action_id
+                    )
+                )
             if not message.tool_calls:
                 content = (message.content or "").strip()
                 if not content and not empty_retry:
@@ -467,6 +486,20 @@ class Orchestrator:
                 result = self._execute_task_call(call, action_id, step_id)
                 self._record_result(result, call.id)
                 continue
+            if self._current_step_awaits_update(action_id):
+                result = self._task_failure(
+                    call.function.name,
+                    action_id,
+                    step_id,
+                    "TASK_STEP_UPDATE_REQUIRED",
+                    (
+                        "The current step already has verified action evidence. Call "
+                        "task_step_update before starting another capability action so later "
+                        "evidence is attached to the correct step."
+                    ),
+                )
+                self._record_result(result, call.id, task_evidence=False)
+                continue
             validated, definition, invalid_result = self._validate_call(call, action_id, step_id)
             if invalid_result is not None:
                 self._record_result(invalid_result, call.id)
@@ -505,6 +538,33 @@ class Orchestrator:
             and plan.action_id == action_id
             and plan.status == TaskPlanStatus.COMPLETED
         )
+
+    def _current_step_awaits_update(self, action_id: UUID) -> bool:
+        plan = self._tasks.snapshot() if self._tasks is not None else None
+        if (
+            plan is None
+            or plan.action_id != action_id
+            or plan.status != TaskPlanStatus.ACTIVE
+            or plan.current_step is None
+        ):
+            return False
+        for evidence in plan.current_step.evidence:
+            if not evidence.ok or evidence.verification_status != "verified":
+                continue
+            try:
+                if not self.registry.get(evidence.tool, require_available=False).read_only:
+                    return True
+            except UnknownToolError:
+                continue
+        return False
+
+    def _completed_plan_response(self, action_id: UUID) -> str:
+        plan = self._tasks.snapshot() if self._tasks is not None else None
+        if plan is not None and plan.action_id == action_id:
+            goal = plan.goal.strip().rstrip(".!")
+            if goal:
+                return f"Done — {goal}."
+        return "Done."
 
     def _reject_post_completion_calls(
         self,
@@ -720,7 +780,13 @@ class Orchestrator:
             return f"Task {plan.status.value}"
         return f"Step {current.number}/{len(plan.steps)}: {current.description}"
 
-    def _record_result(self, result: ToolResult, tool_call_id: str | None) -> None:
+    def _record_result(
+        self,
+        result: ToolResult,
+        tool_call_id: str | None,
+        *,
+        task_evidence: bool = True,
+    ) -> None:
         context = self._tool_context.build(result)
         self.world.record_tool_result(result)
         self.world.apply_tool_observation(result)
@@ -728,7 +794,7 @@ class Orchestrator:
         verification = self._verification_from_evidence(result)
         if verification is not None:
             self.world.record_verification(verification)
-        if self._tasks is not None and result.tool not in TASK_ARGUMENT_TYPES:
+        if task_evidence and self._tasks is not None and result.tool not in TASK_ARGUMENT_TYPES:
             try:
                 read_only = self.registry.get(result.tool, require_available=False).read_only
             except UnknownToolError:
@@ -791,9 +857,11 @@ class Orchestrator:
             )
         return [*messages, *conversation.model_messages]
 
-    async def _request_provider(self, messages: list[ChatMessage]) -> Any:
-        native_tools = self.registry.native_tools()
-        if self._tasks is not None:
+    async def _request_provider(
+        self, messages: list[ChatMessage], *, include_tools: bool = True
+    ) -> Any:
+        native_tools = self.registry.native_tools() if include_tools else []
+        if include_tools and self._tasks is not None:
             native_tools.extend(task_native_tools())
         settings = None
         if self._requests_detailed_response():

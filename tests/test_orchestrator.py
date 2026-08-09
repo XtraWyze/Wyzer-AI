@@ -9,6 +9,7 @@ from tests.fakes import (
     FailingTool,
     OpenApplicationTool,
     SlowEchoTool,
+    VerifiedActionTool,
     text_response,
     tool_response,
 )
@@ -435,6 +436,55 @@ def test_capability_calls_after_plan_completion_never_execute() -> None:
     assert rejected.error is not None
     assert rejected.error.code == "TASK_ALREADY_COMPLETED"
     assert all(result.data != {"echoed": "must-not-run"} for result in results)
+
+
+def test_verified_step_cannot_absorb_later_actions_or_loop_after_completion() -> None:
+    registry = ToolRegistry()
+    registry.register(VerifiedActionTool())
+    tasks = TaskStateStore()
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                (
+                    "task_plan_create",
+                    {
+                        "goal": "Perform both actions",
+                        "steps": [
+                            {"description": "First", "success_criteria": "First verified"},
+                            {"description": "Second", "success_criteria": "Second verified"},
+                        ],
+                    },
+                )
+            ),
+            tool_response(
+                ("verified_action", {"message": "first"}),
+                ("verified_action", {"message": "second-too-early"}),
+            ),
+            tool_response(
+                ("task_step_update", {"step_number": 1, "status": "verified"}),
+                ("verified_action", {"message": "second"}),
+            ),
+            tool_response(
+                ("task_step_update", {"step_number": 2, "status": "verified"}),
+            ),
+            # A misbehaving local model may still emit a call even with no tools offered.
+            tool_response(("verified_action", {"message": "must-not-run"})),
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=tasks)
+
+    response = asyncio.run(assistant.handle("Perform both actions"))
+
+    assert response.text == "Done — Perform both actions."
+    plan = tasks.snapshot()
+    assert plan is not None and plan.status == TaskPlanStatus.COMPLETED
+    assert [len(step.evidence) for step in plan.steps] == [1, 1]
+    results = assistant.world.snapshot().recent_tool_calls
+    deferred = next(result for result in results if result.error is not None)
+    assert deferred.error is not None
+    assert deferred.error.code == "TASK_STEP_UPDATE_REQUIRED"
+    assert all(result.data != {"message": "must-not-run"} for result in results)
+    assert provider.requests[-1][1] == []
 
 
 def test_task_status_and_pause_are_small_local_controls() -> None:

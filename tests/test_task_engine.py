@@ -60,6 +60,20 @@ def test_completed_plan_requires_every_step_to_be_verified() -> None:
         store.record_tool_result(observation, read_only=read_only)
         plan = store.update_step(number, TaskStepStatus.VERIFIED)
     assert plan.status == TaskPlanStatus.COMPLETED
+    assert store.context() is None
+
+
+def test_only_unfinished_plan_is_exposed_as_model_context() -> None:
+    store = TaskStateStore()
+    store.create(uuid4(), "Keep working", steps())
+
+    assert store.context() is not None
+
+    store.pause()
+    assert store.context() is not None
+
+    store.cancel()
+    assert store.context() is None
 
 
 def test_only_current_step_can_be_updated() -> None:

@@ -120,9 +120,8 @@ class WindowsPointerController:
 class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
     name = "inspect_screen"
     description = (
-        "Use local Qwen vision to understand what is visibly present in the focused window or "
-        "full desktop. Vision is primary; Windows UI Automation is an internal fallback for the "
-        "focused window if vision fails."
+        "Use local vision to answer what is visible in the focused window or desktop. This is "
+        "not a prerequisite for clicks; do not use it for a request to click a named target."
     )
     arguments_type = InspectScreenArguments
     result_type = ScreenInspectionResult
@@ -279,8 +278,8 @@ class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
 class ActivateVisualTargetTool(Tool[ActivateVisualTargetArguments, VisualActionResult]):
     name = "activate_visual_target"
     description = (
-        "Click a described visible desktop target. Qwen vision is primary; Windows UI Automation "
-        "is used internally only when vision cannot resolve the target reliably."
+        "Use this to click a user-named visible desktop target; do not call inspect_screen first. "
+        "It locates the target with vision and can fall back to Windows UI Automation internally."
     )
     arguments_type = ActivateVisualTargetArguments
     result_type = VisualActionResult
