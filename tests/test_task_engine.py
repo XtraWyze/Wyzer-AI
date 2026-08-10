@@ -61,6 +61,7 @@ def test_completed_plan_requires_every_step_to_be_verified() -> None:
         plan = store.update_step(number, TaskStepStatus.VERIFIED)
     assert plan.status == TaskPlanStatus.COMPLETED
     assert store.context() is None
+    assert store.summary().startswith("Last task: Observe twice (completed)")
 
 
 def test_only_active_plan_is_exposed_as_model_context() -> None:

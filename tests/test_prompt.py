@@ -25,6 +25,13 @@ def test_system_prompt_distinguishes_managed_and_personal_chrome() -> None:
     assert "personal Chrome" in prompt
     assert "use control_named_window" in prompt
     assert "ask which one" in prompt
+    assert "Never infer the intended Chrome scope" in prompt
+
+
+def test_system_prompt_avoids_generic_follow_up_offers() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "Do not append a generic offer" in prompt
 
 
 def test_system_prompt_contains_bounded_recent_application_and_window_context() -> None:

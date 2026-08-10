@@ -34,6 +34,12 @@ class ConfirmationPolicy:
             return True
         if definition.confirmation == ConfirmationMode.NEVER:
             return False
+        if (
+            definition.name == "control_named_window"
+            and arguments.get("action") == "close"
+            and "chrome" in str(arguments.get("window", "")).casefold()
+        ):
+            return True
         searchable = " ".join(
             str(arguments.get(key, ""))
             for key in (
@@ -98,6 +104,15 @@ class ConfirmationPolicy:
 
     @staticmethod
     def _prompt(tool_name: str, arguments: dict[str, Any]) -> str:
+        if (
+            tool_name == "control_named_window"
+            and arguments.get("action") == "close"
+            and "chrome" in str(arguments.get("window", "")).casefold()
+        ):
+            return (
+                "This will close your personal Chrome window, not Wyzer's managed browser. "
+                "Should I continue?"
+            )
         target = next(
             (
                 str(arguments[key])
@@ -108,6 +123,7 @@ class ConfirmationPolicy:
                     "recipient",
                     "target",
                     "application",
+                    "window",
                     "path",
                     "source",
                     "destination",

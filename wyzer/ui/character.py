@@ -612,7 +612,7 @@ class WyzerCharacter(QWidget):
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
 
-        chat = QAction("Chat with Wyzer", self)
+        chat = QAction(f"Chat with {self.assistant_name}", self)
         chat.triggered.connect(self.open_chat_requested.emit)
         menu.addAction(chat)
 
@@ -643,7 +643,7 @@ class WyzerCharacter(QWidget):
         menu.addAction(hide)
 
         menu.addSeparator()
-        quit_action = QAction("Quit Wyzer", self)
+        quit_action = QAction(f"Quit {self.assistant_name}", self)
         quit_action.triggered.connect(self.quit_requested.emit)
         menu.addAction(quit_action)
         menu.exec(event.globalPos())

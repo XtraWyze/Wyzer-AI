@@ -2,6 +2,29 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.7] - 2026-08-10
+
+### Fixed
+
+- Serialize desktop UI requests so rapid text or voice submissions cannot interleave status and
+  replies, and suppress duplicate stop acknowledgements after an interrupted request unwinds.
+- Load OpenWakeWord before Qt on Windows so UI voice mode does not fail from conflicting native
+  DLL load order; align the installer readiness check with the working import order.
+- Treat custom avatar frames as optional in the readiness check, matching the built-in mascot
+  fallback documented for the desktop UI.
+- Close Windows 11 Calculator reliably when its direct UWP window ignores normal close messages,
+  using an exact Calculator-process fallback only after normal verification fails.
+- Make managed-browser tab inspection read-only when the browser is stopped instead of launching a
+  new Chrome instance, and preserve managed-versus-personal Chrome scope in results.
+- Require an explicitly scoped confirmation before closing a personal Chrome window.
+- Respect personalized assistant names in desktop tray and character actions.
+- Label completed or cancelled persisted plans as the last task instead of the current task.
+
+### Changed
+
+- Expand the live model acceptance documentation to the current 27 representative decisions.
+- Tighten model guidance around Chrome scope and concise routine replies.
+
 ## [0.1.6] - 2026-08-09
 
 ### Added

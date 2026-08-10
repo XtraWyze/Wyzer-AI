@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib
 import re
 import sys
 from collections import deque
 from collections.abc import Sequence
+from contextlib import suppress
 from functools import partial
 
 from wyzer.app.orchestrator import Orchestrator
@@ -283,6 +285,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     wake_phrase = arguments.wake_word or settings.speech.wake_phrase
 
     if arguments.ui:
+        # ONNX Runtime and Qt ship native DLLs with overlapping dependency names
+        # on Windows.  Loading Qt first can make OpenWakeWord fail later with a
+        # misleading DLL initialization error, so prime the selected wake-word
+        # runtime before importing PySide6.  A genuine speech dependency error
+        # is still reported non-fatally by AssistantRuntime after the UI opens.
+        if voice_enabled and settings.speech.wake_word_adapter == "openwakeword":
+            with suppress(Exception):
+                importlib.import_module("openwakeword.model")
         # Qt must own the main Windows thread before pywinauto/comtypes are
         # constructed by the tool registry.  pywinauto otherwise defaults the
         # thread to MTA, while Qt/OLE requires STA, producing 0x80010106.

@@ -706,7 +706,15 @@ def _history(arguments: HistoryArguments, context: ToolContext) -> BrowserAction
 
 def _list_tabs(arguments: NoArguments, context: ToolContext) -> TabListResult:
     del arguments, context
-    with _connection() as (_playwright, browser):
+    if _json_version() is None:
+        return TabListResult(
+            tabs=[],
+            message=(
+                "Wyzer's managed browser is not running. This does not indicate whether a "
+                "personal Chrome window is open."
+            ),
+        )
+    with _connection(auto_start=False) as (_playwright, browser):
         _browser_context, pages = _context_and_pages(browser)
         active = _active_page(browser)
         tabs = [
@@ -825,9 +833,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_open_url",
-                description=(
-                    "Open an exact URL in managed Chrome; starts it automatically."
-                ),
+                description=("Open an exact URL in managed Chrome; starts it automatically."),
                 arguments_type=OpenUrlArguments,
                 result_type=BrowserActionResult,
                 handler=_open_url,
@@ -836,9 +842,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_search_web",
-                description=(
-                    "Search the web in managed Chrome; starts it automatically."
-                ),
+                description=("Search the web in managed Chrome; starts it automatically."),
                 arguments_type=SearchWebArguments,
                 result_type=BrowserActionResult,
                 handler=_search_web,
@@ -847,9 +851,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_inspect_page",
-                description=(
-                    "Read the active page and return element refs for later interaction."
-                ),
+                description=("Read the active page and return element refs for later interaction."),
                 arguments_type=InspectPageArguments,
                 result_type=PageInspectionResult,
                 handler=_inspect,
@@ -858,9 +860,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_click",
-                description=(
-                    "Click a ref from the latest browser_inspect_page result."
-                ),
+                description=("Click a ref from the latest browser_inspect_page result."),
                 arguments_type=ElementRefArguments,
                 result_type=BrowserActionResult,
                 handler=_click,
@@ -927,9 +927,7 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_close_tab",
-                description=(
-                    "Close one managed-browser tab, not the entire browser."
-                ),
+                description=("Close one managed-browser tab, not the entire browser."),
                 arguments_type=CloseTabArguments,
                 result_type=BrowserActionResult,
                 handler=_close_tab,

@@ -16,10 +16,12 @@ from wyzer.runtime_paths import configure_runtime_paths, data_home, find_config_
 
 REQUIRED_MODULES = (
     "pydantic",
+    # Load ONNX Runtime before Qt's native DLLs.  The reverse order can make a
+    # healthy OpenWakeWord installation fail its import on Windows.
+    "openwakeword",
     "PySide6",
     "sounddevice",
     "faster_whisper",
-    "openwakeword",
     "kokoro",
     "torch",
 )
@@ -155,8 +157,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         failures.append(
             "OpenWakeWord support models are missing: " + ", ".join(missing_wake_support)
         )
-    if not avatar_frames:
-        failures.append("No custom avatar frames were installed")
+    # Custom avatar frames are optional.  The desktop UI deliberately falls
+    # back to its built-in vector mascot when this directory is empty.
     if not whisper_ready and not args.allow_missing_model:
         failures.append("The configured Whisper model is not installed")
     if sys.version_info[:2] != (3, 11) or struct.calcsize("P") * 8 != 64:

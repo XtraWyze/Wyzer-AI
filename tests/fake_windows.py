@@ -200,6 +200,12 @@ class FakeWindowsBackend:
             return any(item.process_id == process_id for item in self.processes)
         return any(item.name.casefold() == (name or "").casefold() for item in self.processes)
 
+    def terminate_process(self, process_id: int, timeout_seconds: float = 3) -> bool:
+        del timeout_seconds
+        self.processes = [item for item in self.processes if item.process_id != process_id]
+        self.windows = [item for item in self.windows if item.process_id != process_id]
+        return True
+
     def launch_application(self, application: str) -> tuple[int | None, str]:
         if application == "missing":
             raise ToolExecutionError(
