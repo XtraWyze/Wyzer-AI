@@ -123,3 +123,14 @@ def test_native_tool_schemas_are_json_valid_and_omit_only_display_titles() -> No
         json.dumps(tool.model_dump(mode="json"))
         assert not _contains_key(tool.function.parameters, "title")
         assert tool.function.parameters.get("type") == "object"
+
+
+def test_media_action_schema_explains_skip_direction_to_the_model() -> None:
+    tool = next(
+        tool
+        for tool in create_default_registry().native_tools()
+        if tool.function.name == "control_media"
+    )
+    action = tool.function.parameters["properties"]["action"]
+
+    assert "Use next when the user says skip" in action["description"]

@@ -4,6 +4,7 @@ from tests.fake_windows import FakeWindowsBackend
 from tests.fakes import text_response, tool_response
 from wyzer.app import Orchestrator
 from wyzer.brain import FakeChatProvider
+from wyzer.tasks import TaskPlanStatus, TaskStateStore
 from wyzer.tools import create_default_registry
 from wyzer.workers import InProcessExecutor
 
@@ -62,3 +63,66 @@ def test_multi_tool_request_uses_one_initial_model_decision_and_ordered_results(
         "open_application",
         "control_master_audio",
     ]
+
+
+def test_media_skip_and_game_launch_can_finish_after_task_coordination_rounds() -> None:
+    backend = FakeWindowsBackend()
+    registry = create_default_registry(backend)
+    tasks = TaskStateStore()
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                (
+                    "task_plan_create",
+                    {
+                        "goal": "Skip the current song and open Rocket League",
+                        "steps": [
+                            {
+                                "description": "Skip the current song",
+                                "success_criteria": "A different current track is observed",
+                            },
+                            {
+                                "description": "Open Rocket League",
+                                "success_criteria": "The game window is visible and focused",
+                            },
+                        ],
+                    },
+                )
+            ),
+            tool_response(
+                ("control_media", {"action": "next"}),
+                ("open_application", {"application": "Rocket League"}),
+            ),
+            tool_response(
+                ("get_current_media", {}),
+                ("task_step_update", {"step_number": 1, "status": "verified"}),
+            ),
+            tool_response(
+                ("open_application", {"application": "Rocket League"}),
+                ("task_step_update", {"step_number": 2, "status": "verified"}),
+            ),
+            text_response("Skipped the song and opened Rocket League."),
+        ]
+    )
+    assistant = Orchestrator(
+        registry,
+        InProcessExecutor(registry),
+        provider,
+        maximum_tool_rounds=3,
+        tasks=tasks,
+    )
+
+    response = asyncio.run(assistant.handle("Can you skip this song and open Rocket League"))
+
+    assert response.text == "Skipped the song and opened Rocket League."
+    assert backend.media_actions == ["next"]
+    deferred = next(
+        result
+        for result in assistant.world.snapshot().recent_tool_calls
+        if result.error is not None
+    )
+    assert deferred.error is not None
+    assert deferred.error.code == "TASK_STEP_VERIFICATION_REQUIRED"
+    plan = tasks.snapshot()
+    assert plan is not None and plan.status == TaskPlanStatus.COMPLETED
+    assert [step.status.value for step in plan.steps] == ["verified", "verified"]

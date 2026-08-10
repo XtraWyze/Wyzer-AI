@@ -2,6 +2,16 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.8] - 2026-08-10
+
+### Fixed
+
+- Keep LLM-authored task planning and step-update calls on a separate bounded coordination budget,
+  so completed multi-action work is not reported as a tool-round loop.
+- Prevent a later mutating action from attaching its evidence to a step that is still awaiting a
+  read-only verification observation.
+- Clarify in the model-facing media schema that “skip” means the next track, not the previous one.
+
 ## [0.1.7] - 2026-08-10
 
 ### Fixed

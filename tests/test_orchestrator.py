@@ -227,6 +227,30 @@ def test_hard_tool_round_limit_stops_loop_honestly() -> None:
     assert all(result.data != {"echoed": "second"} for result in results)
 
 
+def test_task_coordination_rounds_have_a_separate_hard_limit() -> None:
+    tasks = TaskStateStore()
+    create_call = (
+        "task_plan_create",
+        {
+            "goal": "Coordinate forever",
+            "steps": [
+                {"description": "First", "success_criteria": "First verified"},
+                {"description": "Second", "success_criteria": "Second verified"},
+            ],
+        },
+    )
+    provider = FakeChatProvider([tool_response(create_call) for _ in range(5)])
+    assistant = build_assistant(
+        ToolRegistry(), provider, maximum_tool_rounds=1, tasks=tasks
+    )
+
+    response = asyncio.run(assistant.handle("Coordinate forever"))
+
+    assert "repeated task-coordination calls" in response.text
+    assert len(provider.requests) == 5
+    assert len(assistant.world.snapshot().recent_tool_calls) == 4
+
+
 def test_interruption_prevents_remaining_calls() -> None:
     async def scenario() -> tuple[Orchestrator, str]:
         registry = ToolRegistry()
