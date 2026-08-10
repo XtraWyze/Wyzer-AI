@@ -82,6 +82,7 @@ _DETAILED_RESPONSE_REQUEST = re.compile(
 class _Continuation:
     remaining_calls: tuple[NativeToolCall, ...]
     tool_rounds: int
+    coordination_rounds: int
 
 
 class Orchestrator:
@@ -111,6 +112,10 @@ class Orchestrator:
         self._executor = executor
         self._provider = provider
         self._maximum_tool_rounds = maximum_tool_rounds
+        # Planning and evidence-state updates do not touch the computer, so they should not
+        # consume the action-attempt budget. Keep their own bound to contain a model that loops
+        # on invalid task transitions.
+        self._maximum_coordination_rounds = max(4, maximum_tool_rounds)
         self._tool_context = ToolResultContextBuilder(tool_result_context_characters)
         self._prompts = SystemPromptBuilder(personality=personality)
         self._detailed_output_tokens = detailed_output_tokens
@@ -251,7 +256,12 @@ class Orchestrator:
                 if self.world.snapshot().pending_confirmation is None:
                     self._finish_action(request.request_id)
 
-    async def _tool_loop(self, action_id: UUID, tool_rounds: int = 0) -> AssistantResponse:
+    async def _tool_loop(
+        self,
+        action_id: UUID,
+        tool_rounds: int = 0,
+        coordination_rounds: int = 0,
+    ) -> AssistantResponse:
         empty_retry = False
         premature_completion_retries = 0
         while True:
@@ -336,7 +346,12 @@ class Orchestrator:
                 return self._finish_response(AssistantResponse(text=content, action_id=action_id))
 
             empty_retry = False
-            if tool_rounds >= self._maximum_tool_rounds:
+            capability_calls = [
+                call
+                for call in message.tool_calls
+                if call.function.name not in TASK_ARGUMENT_TYPES
+            ]
+            if capability_calls and tool_rounds >= self._maximum_tool_rounds:
                 return self._finish_response(
                     AssistantResponse(
                         text=(
@@ -346,10 +361,26 @@ class Orchestrator:
                         action_id=action_id,
                     )
                 )
-            tool_rounds += 1
+            if not capability_calls and coordination_rounds >= self._maximum_coordination_rounds:
+                return self._finish_response(
+                    AssistantResponse(
+                        text=(
+                            "I stopped after repeated task-coordination calls to avoid looping. "
+                            "Ask for task status for details."
+                        ),
+                        action_id=action_id,
+                    )
+                )
+            if capability_calls:
+                tool_rounds += 1
+            else:
+                coordination_rounds += 1
             self.conversation.record_assistant_tool_calls(message)
             confirmation = await self._execute_calls(
-                action_id, message.tool_calls, tool_rounds=tool_rounds
+                action_id,
+                message.tool_calls,
+                tool_rounds=tool_rounds,
+                coordination_rounds=coordination_rounds,
             )
             if confirmation is not None:
                 return confirmation
@@ -430,6 +461,7 @@ class Orchestrator:
         calls: list[NativeToolCall] | tuple[NativeToolCall, ...],
         *,
         tool_rounds: int,
+        coordination_rounds: int = 0,
         confirmed_step: UUID | None = None,
     ) -> AssistantResponse | None:
         completed = self._completed_plan_for(action_id)
@@ -500,6 +532,27 @@ class Orchestrator:
                 )
                 self._record_result(result, call.id, task_evidence=False)
                 continue
+            if self._current_step_needs_verification(action_id):
+                try:
+                    candidate = self.registry.get(
+                        call.function.name, require_available=False
+                    )
+                except UnknownToolError:
+                    candidate = None
+                if candidate is not None and not candidate.read_only:
+                    result = self._task_failure(
+                        call.function.name,
+                        action_id,
+                        step_id,
+                        "TASK_STEP_VERIFICATION_REQUIRED",
+                        (
+                            "The current step has an unverified action. Use a relevant read-only "
+                            "observation, then call task_step_update before starting another "
+                            "mutating capability action."
+                        ),
+                    )
+                    self._record_result(result, call.id, task_evidence=False)
+                    continue
             validated, definition, invalid_result = self._validate_call(call, action_id, step_id)
             if invalid_result is not None:
                 self._record_result(invalid_result, call.id)
@@ -519,7 +572,7 @@ class Orchestrator:
                     inspection,
                 )
                 self._pending_continuation = _Continuation(
-                    tuple(ordered_calls[index + 1 :]), tool_rounds
+                    tuple(ordered_calls[index + 1 :]), tool_rounds, coordination_rounds
                 )
                 self.world.set_confirmation(pending)
                 self.conversation.set_pending_confirmation(pending)
@@ -557,6 +610,16 @@ class Orchestrator:
             except UnknownToolError:
                 continue
         return False
+
+    def _current_step_needs_verification(self, action_id: UUID) -> bool:
+        plan = self._tasks.snapshot() if self._tasks is not None else None
+        return bool(
+            plan is not None
+            and plan.action_id == action_id
+            and plan.status == TaskPlanStatus.ACTIVE
+            and plan.current_step is not None
+            and plan.current_step.status == TaskStepStatus.NEEDS_VERIFICATION
+        )
 
     def _completed_plan_response(self, action_id: UUID) -> str:
         plan = self._tasks.snapshot() if self._tasks is not None else None
@@ -819,7 +882,7 @@ class Orchestrator:
                 ),
                 local=True,
             )
-        continuation = self._pending_continuation or _Continuation((), 1)
+        continuation = self._pending_continuation or _Continuation((), 1, 0)
         self._clear_confirmation()
         confirmed_call = NativeToolCall(
             id=pending.provider_call_id,
@@ -832,12 +895,15 @@ class Orchestrator:
                     pending.action_id,
                     (confirmed_call, *continuation.remaining_calls),
                     tool_rounds=continuation.tool_rounds,
+                    coordination_rounds=continuation.coordination_rounds,
                     confirmed_step=pending.step_id,
                 )
                 if response is not None:
                     return response
                 return await self._tool_loop(
-                    pending.action_id, tool_rounds=continuation.tool_rounds
+                    pending.action_id,
+                    tool_rounds=continuation.tool_rounds,
+                    coordination_rounds=continuation.coordination_rounds,
                 )
             finally:
                 if self.world.snapshot().pending_confirmation is None:

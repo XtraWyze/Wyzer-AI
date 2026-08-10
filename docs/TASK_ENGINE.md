@@ -15,8 +15,14 @@ Steps move through `pending`, `in_progress`, `needs_verification`, `verified`, `
 - Successful read-only observations qualify as verification evidence.
 - Mutating tools qualify only when their evidence explicitly says the action was verified.
 - An unverified mutation requires a relevant observation before step completion.
+- While a mutation is awaiting verification, read-only observations remain available but later
+  mutations wait so their evidence cannot be attached to the wrong step.
 - Repeated failures stop at the configured retry limit.
 - Final prose cannot complete an active plan with unfinished steps.
+
+Capability rounds and task-coordination rounds have separate hard bounds. LLM-authored plan
+creation, revision, and step transitions therefore cannot consume the action-attempt budget, while
+a model that repeats invalid state operations is still stopped safely.
 
 State is saved atomically at the configured `task_engine.state_path`. Startup changes an
 interrupted active plan to paused. A user can inspect or control long work with `task status`,

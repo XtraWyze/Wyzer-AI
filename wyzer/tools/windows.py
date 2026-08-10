@@ -173,7 +173,12 @@ class OpenFileArguments(ToolArguments):
 
 
 class MediaControlArguments(ToolArguments):
-    action: Literal["play_pause", "next", "previous", "stop"] = Field(description="Media action.")
+    action: Literal["play_pause", "next", "previous", "stop"] = Field(
+        description=(
+            "Requested transport action. Use next when the user says skip or skip this song; "
+            "use previous only when they ask to go back or replay the prior track."
+        )
+    )
 
 
 class MasterAudioArguments(ToolArguments):
