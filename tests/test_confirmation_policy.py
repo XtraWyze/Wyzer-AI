@@ -90,7 +90,6 @@ def test_routine_desktop_actions_do_not_require_confirmation() -> None:
     registry = create_default_registry(FakeWindowsBackend())
     never = {
         "open_application",
-        "control_named_window",
         "control_master_audio",
         "control_application_audio",
         "control_media",
@@ -100,9 +99,23 @@ def test_routine_desktop_actions_do_not_require_confirmation() -> None:
     )
     policy = ConfirmationPolicy()
     close = registry.get("control_named_window").definition()
+    assert close.confirmation == ConfirmationMode.CONDITIONAL
     assert (
         policy.requires_confirmation(
             close, {"window": "Calculator", "action": "close", "all_matches": False}
         )
         is False
     )
+    assert (
+        policy.requires_confirmation(
+            close, {"window": "Google Chrome", "action": "close", "all_matches": False}
+        )
+        is True
+    )
+    pending = policy.issue(
+        uuid4(),
+        uuid4(),
+        "control_named_window",
+        {"window": "Google Chrome", "action": "close", "all_matches": False},
+    )
+    assert "personal Chrome" in pending.prompt

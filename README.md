@@ -44,7 +44,7 @@ python -m mypy
 ```
 
 Before a release, run the read-only model acceptance suite against the configured provider. It
-checks 25 representative first decisions against Wyzer's real native tool schemas without executing
+checks 27 representative first decisions against Wyzer's real native tool schemas without executing
 desktop actions:
 
 ```powershell

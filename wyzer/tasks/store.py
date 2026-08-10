@@ -230,7 +230,12 @@ class TaskStateStore:
         plan = self.snapshot()
         if plan is None:
             return "There is no saved task plan."
-        lines = [f"Task: {plan.goal} ({plan.status.value})"]
+        label = (
+            "Last task"
+            if plan.status in {TaskPlanStatus.COMPLETED, TaskPlanStatus.CANCELLED}
+            else "Task"
+        )
+        lines = [f"{label}: {plan.goal} ({plan.status.value})"]
         for step in plan.steps:
             lines.append(f"{step.number}. [{step.status.value}] {step.description}")
         return "\n".join(lines)

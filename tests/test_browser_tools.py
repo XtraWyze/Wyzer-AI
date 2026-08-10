@@ -18,6 +18,7 @@ from wyzer.tools.browser import (
     SearchWebArguments,
     _active_page,
     _history,
+    _list_tabs,
     _stop,
     create_browser_pack,
 )
@@ -88,6 +89,28 @@ def test_stop_reports_already_closed_without_starting(monkeypatch: pytest.Monkey
 
     assert result.running is False
     assert result.message == "The managed browser is already closed."
+
+
+def test_list_tabs_reports_closed_managed_browser_without_starting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import wyzer.tools.browser as module
+
+    monkeypatch.setattr(module, "_json_version", lambda timeout=0.35: None)
+
+    @contextmanager
+    def forbidden_connection(*, auto_start: bool = True):
+        del auto_start
+        raise AssertionError("browser_list_tabs must not start the browser")
+        yield
+
+    monkeypatch.setattr(module, "_connection", forbidden_connection)
+
+    result = _list_tabs(NoArguments(), _context())
+
+    assert result.tabs == []
+    assert "managed browser is not running" in result.message
+    assert "personal Chrome" in result.message
 
 
 def test_stop_closes_connected_managed_browser(monkeypatch: pytest.MonkeyPatch) -> None:

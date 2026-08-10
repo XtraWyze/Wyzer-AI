@@ -671,6 +671,44 @@ def test_named_window_close_focuses_and_retries_when_background_close_is_not_ver
     assert backend.windows == []
 
 
+def test_stubborn_calculator_close_terminates_only_its_exact_process() -> None:
+    class StubbornCalculatorBackend(FakeWindowsBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.windows = [
+                WindowInfo(
+                    handle=200,
+                    title="Calculator",
+                    process_id=20,
+                    application="CalculatorApp.exe",
+                    monitor_id="monitor:1",
+                )
+            ]
+            self.terminated: list[int] = []
+
+        def close_window(self, handle: int, timeout_seconds: float = 3) -> bool:
+            del handle, timeout_seconds
+            return False
+
+        def terminate_process(self, process_id: int, timeout_seconds: float = 3) -> bool:
+            self.terminated.append(process_id)
+            return super().terminate_process(process_id, timeout_seconds)
+
+    backend = StubbornCalculatorBackend()
+
+    result = execute(
+        "control_named_window",
+        {"window": "Calculator", "action": "close"},
+        backend,
+    )
+
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data["verified"] is True
+    assert backend.terminated == [20]
+    assert backend.windows == []
+
+
 def test_personal_chrome_close_excludes_managed_browser_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

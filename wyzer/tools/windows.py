@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from wyzer.desktop.system import WindowsSystemBackend
 from wyzer.models import (
+    ConfirmationMode,
     MonitorDestination,
     MonitorInfo,
     ProcessInfo,
@@ -168,15 +169,11 @@ class ApplicationSearchArguments(ToolArguments):
 
 
 class OpenFileArguments(ToolArguments):
-    path: Path = Field(
-        description="Exact local file path."
-    )
+    path: Path = Field(description="Exact local file path.")
 
 
 class MediaControlArguments(ToolArguments):
-    action: Literal["play_pause", "next", "previous", "stop"] = Field(
-        description="Media action."
-    )
+    action: Literal["play_pause", "next", "previous", "stop"] = Field(description="Media action.")
 
 
 class MasterAudioArguments(ToolArguments):
@@ -303,9 +300,7 @@ class MoveNamedWindowArguments(ToolArguments):
     destination: str = Field(
         min_length=1,
         max_length=128,
-        description=(
-            "Relation, monitor number, or friendly display name."
-        ),
+        description=("Relation, monitor number, or friendly display name."),
     )
 
     @model_validator(mode="before")
@@ -543,9 +538,7 @@ class GetSystemProfileTool(WindowsToolBase, Tool[NoArguments, SystemProfileResul
 
 class IsProcessRunningTool(WindowsToolBase, Tool[ProcessQueryArguments, ProcessRunningResult]):
     name = "is_process_running"
-    description = (
-        "Check a background process; use list_open_windows for desktop app/window status."
-    )
+    description = "Check a background process; use list_open_windows for desktop app/window status."
     arguments_type = ProcessQueryArguments
     result_type = ProcessRunningResult
     risk_level = RiskLevel.LOW
@@ -645,9 +638,7 @@ class OpenApplicationTool(
     WindowsToolBase, Tool[OpenApplicationArguments, BringUpApplicationResult]
 ):
     name = "open_application"
-    description = (
-        "Open or focus a Windows desktop app. For web tasks use browser_* tools."
-    )
+    description = "Open or focus a Windows desktop app. For web tasks use browser_* tools."
     arguments_type = OpenApplicationArguments
     result_type = BringUpApplicationResult
     risk_level = RiskLevel.MEDIUM
@@ -957,9 +948,7 @@ class ControlMediaTool(WindowsToolBase, Tool[MediaControlArguments, OpenTargetRe
 
 class GetCurrentMediaTool(WindowsToolBase, Tool[NoArguments, CurrentMediaResult]):
     name = "get_current_media"
-    description = (
-        "Read current media title, artist, album, source, and status."
-    )
+    description = "Read current media title, artist, album, source, and status."
     arguments_type = NoArguments
     result_type = CurrentMediaResult
     risk_level = RiskLevel.LOW
@@ -972,9 +961,7 @@ class GetCurrentMediaTool(WindowsToolBase, Tool[NoArguments, CurrentMediaResult]
 
 class ControlMasterAudioTool(WindowsToolBase, Tool[MasterAudioArguments, MasterAudioResult]):
     name = "control_master_audio"
-    description = (
-        "Read or control master Windows audio, not a named app's audio."
-    )
+    description = "Read or control master Windows audio, not a named app's audio."
     arguments_type = MasterAudioArguments
     result_type = MasterAudioResult
     risk_level = RiskLevel.MEDIUM
@@ -991,9 +978,7 @@ class ControlMasterAudioTool(WindowsToolBase, Tool[MasterAudioArguments, MasterA
 
 class ListAudioSessionsTool(WindowsToolBase, Tool[NoArguments, AudioSessionsResult]):
     name = "list_audio_sessions"
-    description = (
-        "List active app audio sessions, levels, and mute state."
-    )
+    description = "List active app audio sessions, levels, and mute state."
     arguments_type = NoArguments
     result_type = AudioSessionsResult
     risk_level = RiskLevel.LOW
@@ -1008,9 +993,7 @@ class ControlApplicationAudioTool(
     WindowsToolBase, Tool[ApplicationAudioArguments, ApplicationAudioResult]
 ):
     name = "control_application_audio"
-    description = (
-        "Control a named app's audio, not master audio; list sessions if uncertain."
-    )
+    description = "Control a named app's audio, not master audio; list sessions if uncertain."
     arguments_type = ApplicationAudioArguments
     result_type = ApplicationAudioResult
     risk_level = RiskLevel.MEDIUM
@@ -1033,9 +1016,7 @@ class ControlApplicationAudioTool(
 
 class MuteAllAudioExceptTool(WindowsToolBase, Tool[AudioSessionsBatchArguments, AudioBatchResult]):
     name = "mute_all_audio_except"
-    description = (
-        "Mute every current app audio session except the named apps."
-    )
+    description = "Mute every current app audio session except the named apps."
     arguments_type = AudioSessionsBatchArguments
     result_type = AudioBatchResult
     risk_level = RiskLevel.MEDIUM
@@ -1084,9 +1065,7 @@ class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
 
 class ListOpenWindowsTool(WindowsToolBase, Tool[ListWindowsArguments, WindowsResult]):
     name = "list_open_windows"
-    description = (
-        "Live-check desktop windows by app/title or monitor; includes minimized windows."
-    )
+    description = "Live-check desktop windows by app/title or monitor; includes minimized windows."
     arguments_type = ListWindowsArguments
     result_type = WindowsResult
     risk_level = RiskLevel.LOW
@@ -1154,9 +1133,7 @@ class MoveNamedWindowToMonitorTool(
     WindowsToolBase, Tool[MoveNamedWindowArguments, WindowActionResult]
 ):
     name = "move_named_window_to_monitor"
-    description = (
-        "Move one open window by monitor relation, number, or display name."
-    )
+    description = "Move one open window by monitor relation, number, or display name."
     arguments_type = MoveNamedWindowArguments
     result_type = WindowActionResult
     risk_level = RiskLevel.MEDIUM
@@ -1227,9 +1204,7 @@ class MoveNamedWindowToMonitorTool(
 
 class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
     name = "get_monitor_layout"
-    description = (
-        "Return monitor numbers, names, bounds, primary status, and relative positions."
-    )
+    description = "Return monitor numbers, names, bounds, primary status, and relative positions."
     arguments_type = NoArguments
     result_type = MonitorsResult
     risk_level = RiskLevel.LOW
@@ -1250,6 +1225,7 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
     result_type = WindowActionResult
     risk_level = RiskLevel.MEDIUM
     read_only = False
+    confirmation = ConfirmationMode.CONDITIONAL
 
     def execute(
         self, arguments: NamedWindowActionArguments, context: ToolContext
@@ -1355,7 +1331,21 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
             )
             if still_open is None:
                 return True
-            return self.backend.close_window(still_open.handle, 3.0)
+            closed = self.backend.close_window(still_open.handle, 3.0)
+            if closed:
+                return True
+
+            # Current Windows 11 Calculator builds can leave their direct UWP
+            # window alive after both WM_CLOSE attempts. Calculator has no
+            # unsaved document state, so terminate only its exact process as a
+            # final fallback. Never apply this escalation to other apps.
+            if application == "calculatorapp.exe":
+                terminate = getattr(self.backend, "terminate_process", None)
+                if callable(terminate) and terminate(window.process_id, 3.0):
+                    return not any(
+                        item.process_id == window.process_id for item in self.backend.list_windows()
+                    )
+            return False
 
         if arguments.action == "close":
             outcomes = [close_with_focus_recovery(window) for window in selected]

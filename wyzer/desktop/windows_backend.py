@@ -225,6 +225,24 @@ class CtypesWindowsBackend:
             for process in self.list_processes()
         )
 
+    def terminate_process(self, process_id: int, timeout_seconds: float = 3) -> bool:
+        """Terminate one exact process and verify that it exited."""
+        try:
+            process = psutil.Process(process_id)
+            process.terminate()
+            process.wait(timeout=timeout_seconds)
+        except psutil.NoSuchProcess:
+            return True
+        except psutil.TimeoutExpired:
+            return False
+        except psutil.AccessDenied as error:
+            raise ToolExecutionError(
+                "PROCESS_TERMINATION_DENIED",
+                "Windows denied permission to close that application process.",
+                details={"process_id": process_id},
+            ) from error
+        return not psutil.pid_exists(process_id)
+
     def launch_application(self, application: str) -> tuple[int | None, str]:
         requested = application.strip()
         normalized = requested.casefold()

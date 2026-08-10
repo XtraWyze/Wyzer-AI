@@ -83,6 +83,8 @@ class AssistantRuntime(QObject):
         self._speaker = create_speech_synthesizer(settings.speech)
         self._speaking = threading.Event()
         self._speech_generation = 0
+        self._stop_acknowledgement_generation = 0
+        self._request_lock: asyncio.Lock | None = None
         self._interrupt_warning_emitted = False
         self.assistant.set_progress_callback(self.status_changed.emit)
 
@@ -142,7 +144,17 @@ class AssistantRuntime(QObject):
         asyncio.run_coroutine_threadsafe(self._handle(text, speak_reply=speak_reply), loop)
 
     async def _handle(self, text: str, *, speak_reply: bool) -> None:
+        # Text chat and voice can both submit work to this runtime.  Keep the
+        # presentation state single-flight so a queued request cannot make the
+        # UI appear idle while another request is still running.
+        if self._request_lock is None:
+            self._request_lock = asyncio.Lock()
+        async with self._request_lock:
+            await self._handle_one(text, speak_reply=speak_reply)
+
+    async def _handle_one(self, text: str, *, speak_reply: bool) -> None:
         speech_generation = self._speech_generation
+        stop_acknowledgement_generation = self._stop_acknowledgement_generation
         self.status_changed.emit("Thinking")
         action = asyncio.create_task(self.assistant.handle(text))
         detector = self._build_interrupt_detector(allow_bare=True) if speak_reply else None
@@ -182,6 +194,14 @@ class AssistantRuntime(QObject):
             self.replied.emit(pause_response.text)
             self.status_changed.emit("Idle")
             return
+        if (
+            response.interrupted
+            and stop_acknowledgement_generation != self._stop_acknowledgement_generation
+        ):
+            # stop_current() already gave the user immediate feedback.  The
+            # Orchestrator returns the same acknowledgement as it unwinds.
+            self.status_changed.emit("Idle")
+            return
         self.replied.emit(response.text)
         if speak_reply and not self._muted and speech_generation == self._speech_generation:
             await self._speak(response.text)
@@ -201,6 +221,8 @@ class AssistantRuntime(QObject):
     def _stop_current_on_loop(self, speech_stopped: bool = False) -> None:
         self._speech_generation += 1
         stopped = self.assistant.interrupt() or speech_stopped
+        if stopped:
+            self._stop_acknowledgement_generation += 1
         self.replied.emit("Okay, I stopped it." if stopped else "There is no active task.")
         self.status_changed.emit("Idle")
 
@@ -464,13 +486,13 @@ class DesktopCompanion(QObject):
         menu = QMenu()
         show_action = menu.addAction("Show character")
         show_action.triggered.connect(self.character.show)
-        chat_action = menu.addAction("Chat with Wyzer")
+        chat_action = menu.addAction(f"Chat with {assistant_name}")
         chat_action.triggered.connect(self.open_chat)
         menu.addSeparator()
         stop_action = menu.addAction("Stop current task")
         stop_action.triggered.connect(self.runtime.stop_current)
         menu.addSeparator()
-        quit_action = menu.addAction("Quit Wyzer")
+        quit_action = menu.addAction(f"Quit {assistant_name}")
         quit_action.triggered.connect(self.app.quit)
         self._tray_menu = menu
         tray.setContextMenu(menu)
