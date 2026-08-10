@@ -35,6 +35,13 @@ Wyzer calls `POST /api/chat` with `stream=false`, a top-level `tools` array, and
 system/user/assistant/tool messages. Tool selection does not use `format` or a structured plan.
 `think` stays disabled by default for quick commands. `keep_alive` keeps the model loaded.
 
+The `tools` array is a registry-backed capability view rather than the entire installed surface.
+Routine app, window, audio, media, and system commands are present immediately. For browser, file,
+clipboard, perception, diagnostics, desktop-interaction, or enabled extension work, the primary
+model discovers and activates the relevant pack and receives its tools on a following request.
+Natural-language understanding remains entirely model-driven; Wyzer does not select packs from
+keywords or deterministic command parsing.
+
 For on-demand screen perception, the configured Ollama model must also support vision. Wyzer
 sends the captured JPEG as a base64 `images` entry to `POST /api/chat` only when
 `inspect_screen` or `activate_visual_target` is used. Normal text/tool turns remain text-only.
@@ -69,7 +76,19 @@ You: stop
 ```
 
 The first prompt should take one model request. Simple actions should select a tool, execute locally,
-and receive a final answer after the result. `stop` is handled locally.
+and receive a final answer after the result without capability discovery. A first use of a
+specialized capability may take discovery and activation rounds. An active planned task retains its
+activated packs so they are not repeatedly rediscovered. `stop` is handled locally.
+
+Inspect model-context size without changing normal user output:
+
+```powershell
+python -m wyzer.dev.measure_context --json
+python -m wyzer.dev.measure_context --activate browser --json
+```
+
+The report includes registered and visible tool counts, current/complete serialized schema sizes,
+approximate tokens, and activated packs.
 
 ## Compatible endpoints
 

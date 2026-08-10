@@ -56,6 +56,7 @@ class TaskPlan(FrozenModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     revision_reason: str = Field(default="", max_length=1_000)
+    active_capabilities: list[str] = Field(default_factory=list)
 
     @property
     def current_step(self) -> TaskStep | None:

@@ -110,3 +110,20 @@ def test_active_plan_is_recovered_as_paused(tmp_path: Path) -> None:
     assert recovered is not None
     assert recovered.action_id == action_id
     assert recovered.status == TaskPlanStatus.PAUSED
+
+
+def test_active_capabilities_persist_with_planned_task(tmp_path: Path) -> None:
+    path = tmp_path / "task.json"
+    store = TaskStateStore(path)
+    plan = store.create(
+        uuid4(),
+        "Use files",
+        steps(),
+        active_capabilities=("files",),
+    )
+    store.activate_capability("browser")
+
+    assert plan.active_capabilities == ["files"]
+    recovered = TaskStateStore(path).snapshot()
+    assert recovered is not None
+    assert recovered.active_capabilities == ["browser", "files"]

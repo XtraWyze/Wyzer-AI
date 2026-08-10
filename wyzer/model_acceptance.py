@@ -16,6 +16,11 @@ from wyzer.config import WyzerSettings
 from wyzer.models import ChatMessage, ConversationState, WorldStateSnapshot
 from wyzer.tasks.tools import task_native_tools
 from wyzer.tools import create_default_registry
+from wyzer.tools.capabilities import (
+    ACTIVATE_CAPABILITY_TOOL,
+    CAPABILITY_COORDINATION_TOOLS,
+    LIST_CAPABILITIES_TOOL,
+)
 
 
 class AcceptanceCase(BaseModel):
@@ -36,6 +41,7 @@ class CaseResult(BaseModel):
     passed: bool
     expected_tools: list[str]
     actual_tools: list[str]
+    tool_trace: list[str] = Field(default_factory=list)
     forbidden_tools_seen: list[str]
     latency_ms: int
     response_text: str
@@ -84,8 +90,12 @@ async def evaluate(
         },
         enabled_entrypoint_packs=settings.tool_packs.enabled,
     )
-    tools = [*registry.native_tools(), *task_native_tools()]
-    available_tools = {tool.function.name for tool in tools}
+    default_tools = [*registry.native_tools(), *task_native_tools()]
+    available_tools = {tool.function.name for tool in default_tools}
+    all_available_tools = {
+        *(tool.function.name for tool in registry.all_native_tools()),
+        *(tool.function.name for tool in task_native_tools()),
+    }
     known_tools = {*registry, *(tool.function.name for tool in task_native_tools())}
     for case in cases:
         unknown = (set(case.expected_tools) | set(case.forbidden_tools)) - known_tools
@@ -93,7 +103,7 @@ async def evaluate(
             raise ValueError(
                 f"case {case.case_id} references unknown tools: {', '.join(sorted(unknown))}"
             )
-        unavailable = set(case.expected_tools) - available_tools
+        unavailable = set(case.expected_tools) - all_available_tools
         if unavailable:
             raise ValueError(
                 f"case {case.case_id} expects unavailable tools: {', '.join(sorted(unavailable))}"
@@ -107,14 +117,131 @@ async def evaluate(
     for case in cases:
         started = time.perf_counter()
         try:
-            response = await provider.chat(
-                [
-                    ChatMessage(role="system", content=system_prompt),
-                    ChatMessage(role="user", content=case.prompt),
-                ],
-                tools,
-            )
-            actual = [call.function.name for call in response.message.tool_calls]
+            messages = [
+                ChatMessage(role="system", content=system_prompt),
+                ChatMessage(role="user", content=case.prompt),
+            ]
+            activated: set[str] = set()
+            trace: list[str] = []
+            actual: list[str] = []
+            response_text = ""
+            for _ in range(6):
+                tools = [
+                    *registry.model_view(activated).native_tools(),
+                    *task_native_tools(),
+                ]
+                offered = {tool.function.name for tool in tools}
+                response = await provider.chat(messages, tools)
+                calls = response.message.tool_calls
+                names = [call.function.name for call in calls]
+                trace.extend(names)
+                response_text = (response.message.content or "").strip()
+                if not calls:
+                    actual = []
+                    break
+
+                # Core expectations must remain direct; only specialized expectations may
+                # use capability coordination in this read-only simulation.
+                expected_is_specialized = bool(
+                    case.expected_tools and not set(case.expected_tools).issubset(available_tools)
+                )
+                if not expected_is_specialized and any(
+                    name in CAPABILITY_COORDINATION_TOOLS for name in names
+                ):
+                    actual = names
+                    break
+
+                messages.append(response.message)
+                if all(name == LIST_CAPABILITIES_TOOL for name in names):
+                    serialized_payload = json.dumps(
+                        {
+                            "ok": True,
+                            "data": {"capabilities": registry.capability_manifest(activated)},
+                        },
+                        separators=(",", ":"),
+                    )
+                    for call in calls:
+                        messages.append(
+                            ChatMessage(
+                                role="tool",
+                                name=call.function.name,
+                                tool_call_id=call.id,
+                                content=serialized_payload,
+                            )
+                        )
+                    continue
+
+                if all(name == ACTIVATE_CAPABILITY_TOOL for name in names):
+                    activation_failed = False
+                    for call in calls:
+                        name = str(call.function.arguments.get("name") or "")
+                        if name not in registry.available_capabilities():
+                            activation_failed = True
+                            payload_data = {
+                                "ok": False,
+                                "error": {
+                                    "code": "UNKNOWN_CAPABILITY",
+                                    "message": f"No activatable capability named {name}.",
+                                },
+                            }
+                        else:
+                            activated.add(name)
+                            payload_data = {
+                                "ok": True,
+                                "data": {
+                                    "name": name,
+                                    "instruction": (
+                                        "Use the newly available tools on the next native round."
+                                    ),
+                                },
+                            }
+                        messages.append(
+                            ChatMessage(
+                                role="tool",
+                                name=call.function.name,
+                                tool_call_id=call.id,
+                                content=json.dumps(payload_data, separators=(",", ":")),
+                            )
+                        )
+                    if activation_failed:
+                        continue
+                    continue
+
+                inactive = [
+                    call
+                    for call in calls
+                    if call.function.name in registry and call.function.name not in offered
+                ]
+                if len(inactive) == len(calls):
+                    for call in inactive:
+                        pack = registry.tool_pack(call.function.name)
+                        messages.append(
+                            ChatMessage(
+                                role="tool",
+                                name=call.function.name,
+                                tool_call_id=call.id,
+                                content=json.dumps(
+                                    {
+                                        "ok": False,
+                                        "error": {
+                                            "code": "CAPABILITY_NOT_ACTIVE",
+                                            "message": (
+                                                f"Capability {pack} is not active. List and "
+                                                "activate it, then retry on the next round."
+                                            ),
+                                        },
+                                    },
+                                    separators=(",", ":"),
+                                ),
+                            )
+                        )
+                    continue
+
+                actual = names
+                break
+            else:
+                actual = trace[-1:]
+
             forbidden_seen = [name for name in actual if name in case.forbidden_tools]
             passed = actual == case.expected_tools and not forbidden_seen
             results.append(
@@ -123,9 +250,10 @@ async def evaluate(
                     passed=passed,
                     expected_tools=case.expected_tools,
                     actual_tools=actual,
+                    tool_trace=trace,
                     forbidden_tools_seen=forbidden_seen,
                     latency_ms=round((time.perf_counter() - started) * 1_000),
-                    response_text=(response.message.content or "").strip(),
+                    response_text=response_text,
                 )
             )
         except Exception as error:
@@ -135,6 +263,7 @@ async def evaluate(
                     passed=False,
                     expected_tools=case.expected_tools,
                     actual_tools=[],
+                    tool_trace=[],
                     forbidden_tools_seen=[],
                     latency_ms=round((time.perf_counter() - started) * 1_000),
                     response_text="",
@@ -163,6 +292,8 @@ def _print_summary(report: AcceptanceReport) -> None:
             f"[{marker}] {result.case_id}: expected {expected}; got {actual} "
             f"({result.latency_ms} ms)"
         )
+        if result.tool_trace != result.actual_tools:
+            print(f"       trace: {', '.join(result.tool_trace) or 'text response'}")
         if result.error:
             print(f"       error: {result.error}")
     print(

@@ -24,6 +24,10 @@ Capability rounds and task-coordination rounds have separate hard bounds. LLM-au
 creation, revision, and step transitions therefore cannot consume the action-attempt budget, while
 a model that repeats invalid state operations is still stopped safely.
 
+Capability discovery and activation use the coordination bound rather than the computer-action
+budget. Activated pack names are stored with an active plan and restored on explicit resume. They
+are visibility state only and never satisfy a step's evidence gate.
+
 State is saved atomically at the configured `task_engine.state_path`. Startup changes an
 interrupted active plan to paused. A user can inspect or control long work with `task status`,
 `pause`, `resume`, and `stop`; all task contents and recovery decisions remain model-driven.

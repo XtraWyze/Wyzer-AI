@@ -20,6 +20,7 @@ def execute(tool: str, arguments: dict[str, object], backend: FakeWindowsBackend
 def test_default_registry_contains_all_builtin_tools() -> None:
     registry = create_default_registry(FakeWindowsBackend())
     expected = {
+        "activate_tool_capability",
         "get_system_profile",
         "diagnose_system",
         "open_application",
@@ -39,6 +40,7 @@ def test_default_registry_contains_all_builtin_tools() -> None:
         "wait_ms",
         "get_foreground_window",
         "list_open_windows",
+        "list_tool_capabilities",
         "move_named_window_to_monitor",
         "get_monitor_layout",
         "control_named_window",
@@ -774,16 +776,20 @@ def test_diagnose_system_schema_keeps_scope_bounded() -> None:
     assert registry.get("diagnose_system").read_only is True
 
 
-def test_native_tool_menu_hides_internal_diagnostics() -> None:
+def test_native_tool_views_scope_optional_packs_and_hide_internal_tools() -> None:
     registry = create_default_registry(FakeWindowsBackend())
     visible = {tool.function.name for tool in registry.native_tools()}
+    diagnostics_visible = {
+        tool.function.name for tool in registry.model_view(("diagnostics",)).native_tools()
+    }
 
     assert "open_application" in visible
     assert "control_named_window" in visible
     assert "move_named_window_to_monitor" in visible
     assert "mute_all_audio_except" in visible
     assert "get_system_profile" in visible
-    assert "diagnose_system" in visible
+    assert "diagnose_system" not in visible
+    assert "diagnose_system" in diagnostics_visible
     assert "list_running_processes" not in visible
     assert "is_process_running" in visible
     assert "refresh_application_index" not in visible

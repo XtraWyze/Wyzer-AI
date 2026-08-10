@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from wyzer.desktop.system import WindowsSystemBackend
 from wyzer.desktop.windows_backend import CtypesWindowsBackend
 from wyzer.files import FileCatalog
-from wyzer.tools.builtin_packs import create_builtin_packs
+from wyzer.tools.builtin_packs import DEFAULT_CAPABILITY_PACKS, create_builtin_packs
 from wyzer.tools.discovery import load_enabled_tool_packs
 from wyzer.tools.files import FileToolPack
 from wyzer.tools.packs import ToolPackFactory
@@ -32,10 +32,10 @@ def create_default_registry(
     backend = backend or CtypesWindowsBackend(audio_options=audio_options)
     registry = ToolRegistry()
     for pack in create_builtin_packs(backend, perception_options):
-        registry.register_pack(pack)
-    registry.register_pack(FileToolPack(FileCatalog(), backend))
+        registry.register_pack(pack, default_visible=pack.name in DEFAULT_CAPABILITY_PACKS)
+    registry.register_pack(FileToolPack(FileCatalog(), backend), default_visible=False)
     for pack_factory in extra_pack_factories:
-        registry.register_pack(pack_factory())
+        registry.register_pack(pack_factory(), default_visible=False)
     for pack in load_enabled_tool_packs(tuple(enabled_entrypoint_packs)):
-        registry.register_pack(pack)
+        registry.register_pack(pack, default_visible=False)
     return registry

@@ -10,6 +10,7 @@ from wyzer.tasks.tools import TASK_ARGUMENT_TYPES, task_native_tools
 from wyzer.tools import create_default_registry
 
 EXPECTED_MODEL_TOOL_NAMES = {
+    "activate_tool_capability",
     "activate_visual_target",
     "browser_click",
     "browser_close_tab",
@@ -42,6 +43,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "list_directory",
     "list_installed_games",
     "list_open_windows",
+    "list_tool_capabilities",
     "move_named_window_to_monitor",
     "move_path",
     "mute_all_audio_except",
@@ -62,9 +64,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "type_desktop_text",
     "write_clipboard",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = (
-    "bb559bded12f44eeeea5a32c7a96fbac006a240ef2cbf33bd3e722b0a03928fe"
-)
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "896a69134f7ef95b639b7b4661477141c7c3f7ba2f8ac9bf29e8f65145d7bd4f"
 
 
 def _semantic_schema(value: Any) -> Any:
@@ -111,12 +111,7 @@ def test_model_tool_names_and_semantic_argument_contracts_are_stable() -> None:
 def test_native_tool_schemas_are_json_valid_and_omit_only_display_titles() -> None:
     registry = create_default_registry()
     tools = [*registry.native_tools(), *task_native_tools()]
-    expected_available_names = {
-        definition.name
-        for definition in registry.definitions()
-        if definition.available
-        and registry.get(definition.name, require_available=False).llm_visible
-    } | set(TASK_ARGUMENT_TYPES)
+    expected_available_names = set(registry.model_view().tool_names) | set(TASK_ARGUMENT_TYPES)
 
     assert {tool.function.name for tool in tools} == expected_available_names
     for tool in tools:

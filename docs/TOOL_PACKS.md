@@ -6,7 +6,9 @@ results.
 
 ## Built-in packs
 
-The default registry contains eleven focused packs:
+The default registry contains twelve focused packs:
+
+- `capabilities`: compact model-driven pack discovery and activation coordination.
 
 - `applications`: open/focus apps, application discovery, games, and opening a local file.
 - `audio`: master and per-application Windows audio controls.
@@ -20,9 +22,10 @@ The default registry contains eleven focused packs:
 - `system`: system profile, process inspection, and bounded waits.
 - `windows`: named-window control and physical monitor movement.
 
-The built-in registry contains 56 tools. Browser, clipboard, desktop-interaction, and perception tools are core
-Wyzer capabilities; they do not need separate installation and must not be listed under
-`[tool_packs].enabled`.
+The built-in registry contains 58 tools. Applications, audio, media, system, windows, and capability
+coordination are in the default model view. Browser, clipboard, desktop interaction, diagnostics,
+files, and perception remain built in but are activated on demand by the primary LLM. Built-in packs
+do not need separate installation and must not be listed under `[tool_packs].enabled`.
 
 ## Migrating from the old optional packs
 
@@ -55,9 +58,9 @@ The entry-point extension system remains available for genuinely optional third-
 Installed external packs never activate automatically. Only names explicitly listed in
 `[tool_packs].enabled` are loaded.
 
-Keep external packs small, clearly scoped, and user-oriented. A small local model should normally
-see fewer than roughly 50 model-visible tools at once, so optional packs should earn the schema
-space they consume.
+Keep external packs small, clearly scoped, and user-oriented. Enabled external packs are registered
+at startup but enter the model-visible view only after model-requested activation. Activation never
+imports new code and cannot reveal a tool marked hidden.
 
 ## Documentation-only example
 

@@ -13,10 +13,14 @@ from typing import Any
 from wyzer.desktop.system import WindowsSystemBackend
 from wyzer.tools.base import Tool
 from wyzer.tools.browser import create_browser_pack
+from wyzer.tools.capabilities import (
+    ActivateToolCapabilityTool,
+    ListToolCapabilitiesTool,
+)
 from wyzer.tools.clipboard import create_clipboard_pack
 from wyzer.tools.desktop_interaction import create_desktop_interaction_pack
 from wyzer.tools.diagnostics import DiagnoseSystemTool
-from wyzer.tools.packs import ToolPack
+from wyzer.tools.packs import SimpleToolPack, ToolPack
 from wyzer.tools.perception import create_perception_pack
 from wyzer.tools.windows import (
     ControlApplicationAudioTool,
@@ -65,6 +69,10 @@ def create_builtin_packs(
     """Return the default packs in a stable registration order."""
 
     return (
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        ),
         BackendToolPack(
             "applications",
             backend,
@@ -129,6 +137,7 @@ def create_builtin_packs(
 
 
 BUILTIN_PACK_NAMES = (
+    "capabilities",
     "applications",
     "audio",
     "browser",
@@ -140,4 +149,9 @@ BUILTIN_PACK_NAMES = (
     "media",
     "system",
     "windows",
+)
+
+
+DEFAULT_CAPABILITY_PACKS = frozenset(
+    {"applications", "audio", "capabilities", "media", "system", "windows"}
 )

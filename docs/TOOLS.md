@@ -2,9 +2,20 @@
 
 `ToolRegistry` is Wyzer's sole model-visible allowlist. Every tool declares a unique name,
 description, Pydantic argument/result types, read-only status, confirmation policy, availability,
-and timeout. Native model definitions are generated directly from this registry.
+timeout, and capability-pack ownership. Native definitions are always generated from this registry.
 
-## Default capability packs
+The default `ModelToolView` contains the `applications`, `audio`, `media`, `system`, and `windows`
+packs plus two visibility coordination tools. Specialized packs are absent until the same primary
+LLM requests compact discovery and activates one. Activation can expose only already registered,
+available, `llm_visible` tools; it cannot change argument validation, confirmation policy, risk,
+execution, or evidence handling. It is capability visibility filtering, not intent routing.
+
+`list_tool_capabilities` returns only optional pack names, visible tool counts, and active status.
+`activate_tool_capability` retains one pack for the current action and, when a task plan is active,
+in that plan. The activated tools are offered on the next provider round. Unrelated packs do not
+accumulate across completed actions, and hidden/internal tools are never surfaced.
+
+## Capability packs
 
 ### Applications
 
@@ -28,6 +39,8 @@ model-visible.
 
 ### Browser
 
+The browser pack is activated on demand.
+
 The built-in `browser` pack exclusively owns webpage actions:
 
 - `browser_start` and `browser_status` (registered but hidden from the model)
@@ -50,7 +63,7 @@ Automation and blind coordinates.
 
 ### Clipboard
 
-The built-in `clipboard` pack provides:
+The on-demand built-in `clipboard` pack provides:
 
 - `read_clipboard`
 - `write_clipboard`
@@ -62,7 +75,7 @@ before the shortcut is sent.
 
 ### Desktop interaction
 
-The built-in `desktop_interaction` pack retains Windows UI Automation, but UIA is no longer the
+The on-demand built-in `desktop_interaction` pack retains Windows UI Automation, but UIA is no longer the
 model's primary desktop perception path:
 
 - `inspect_desktop_ui` — internal/hidden fallback
@@ -81,7 +94,7 @@ Webpage tasks should remain on the `browser_*` tools rather than using desktop i
 
 ### Screen perception
 
-The built-in `perception` pack adds two high-level tools:
+The on-demand built-in `perception` pack adds two high-level tools:
 
 - `inspect_screen`: capture the focused window or full desktop and ask the configured local Qwen/Ollama vision model what is visibly present.
 - `activate_visual_target`: primary visible-target click path. It uses Qwen vision first and may fall back internally to UI Automation.

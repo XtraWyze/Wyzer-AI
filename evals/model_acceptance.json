@@ -12,6 +12,18 @@
     "forbidden_tools": ["get_system_profile"]
   },
   {
+    "case_id": "discuss_browser_without_action",
+    "prompt": "In one sentence, what is a web browser?",
+    "expected_tools": [],
+    "forbidden_tools": ["list_tool_capabilities", "activate_tool_capability", "browser_open_url"]
+  },
+  {
+    "case_id": "discuss_files_without_action",
+    "prompt": "Explain why file names often have extensions.",
+    "expected_tools": [],
+    "forbidden_tools": ["list_tool_capabilities", "activate_tool_capability", "search_files"]
+  },
+  {
     "case_id": "open_calculator",
     "prompt": "Open Calculator.",
     "expected_tools": ["open_application"],

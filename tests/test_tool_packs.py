@@ -115,6 +115,7 @@ def test_default_factory_composes_builtin_and_extra_packs() -> None:
         "applications",
         "audio",
         "browser",
+        "capabilities",
         "clipboard",
         "desktop_interaction",
         "diagnostics",
@@ -128,6 +129,23 @@ def test_default_factory_composes_builtin_and_extra_packs() -> None:
     assert registry.tool_pack("echo") == "example"
     assert registry.tool_pack("open_application") == "applications"
     assert registry.tool_pack("search_files") == "files"
+
+
+def test_default_model_view_keeps_basic_actions_and_scopes_specialized_packs() -> None:
+    registry = create_default_registry(FakeWindowsBackend())
+    default_names = set(registry.model_view().tool_names)
+    all_names = {tool.function.name for tool in registry.all_native_tools()}
+
+    assert {
+        "open_application",
+        "control_application_audio",
+        "control_named_window",
+        "move_named_window_to_monitor",
+        "list_tool_capabilities",
+        "activate_tool_capability",
+    } <= default_names
+    assert {"browser_search_web", "search_files", "inspect_screen"}.isdisjoint(default_names)
+    assert {"browser_search_web", "search_files", "inspect_screen"} <= all_names
 
 
 def test_entrypoint_packs_load_only_when_explicitly_enabled(
