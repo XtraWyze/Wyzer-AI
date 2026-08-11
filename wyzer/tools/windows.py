@@ -643,7 +643,9 @@ class OpenApplicationTool(
     WindowsToolBase, Tool[OpenApplicationArguments, BringUpApplicationResult]
 ):
     name = "open_application"
-    description = "Open or focus a Windows desktop app. For web tasks use browser_* tools."
+    description = (
+        "Launch or focus an installed Windows app only. Never use for a URL, website, or file contents."
+    )
     arguments_type = OpenApplicationArguments
     result_type = BringUpApplicationResult
     risk_level = RiskLevel.MEDIUM
@@ -808,7 +810,7 @@ class SearchInstalledApplicationsTool(
     WindowsToolBase, Tool[ApplicationSearchArguments, ApplicationSearchResult]
 ):
     name = "search_installed_applications"
-    description = "Search installed desktop apps and games."
+    description = "Find installed app or game names only. Never use to find a file, path, or website."
     arguments_type = ApplicationSearchArguments
     result_type = ApplicationSearchResult
     risk_level = RiskLevel.LOW
@@ -867,7 +869,10 @@ class ListInstalledApplicationsTool(WindowsToolBase, Tool[NoArguments, Applicati
 
 class OpenFileTool(WindowsToolBase, Tool[OpenFileArguments, OpenTargetResult]):
     name = "open_file"
-    description = "Open an existing file in its default Windows app."
+    description = (
+        "Launch the default app for one exact existing file only. For file contents, discovery, "
+        "listing, creation, movement, renaming, or deletion, activate the files capability."
+    )
     arguments_type = OpenFileArguments
     result_type = OpenTargetResult
     risk_level = RiskLevel.MEDIUM
@@ -939,7 +944,10 @@ def _unverified_command(target: str) -> OpenTargetResult:
 
 class ControlMediaTool(WindowsToolBase, Tool[MediaControlArguments, OpenTargetResult]):
     name = "control_media"
-    description = "Control the active Windows media session."
+    description = (
+        "Change active media playback: play/pause, next, previous, or stop. Use for playback "
+        "commands; get_current_media only reports status; never use it to close a browser or window."
+    )
     arguments_type = MediaControlArguments
     result_type = OpenTargetResult
     risk_level = RiskLevel.MEDIUM
@@ -953,7 +961,10 @@ class ControlMediaTool(WindowsToolBase, Tool[MediaControlArguments, OpenTargetRe
 
 class GetCurrentMediaTool(WindowsToolBase, Tool[NoArguments, CurrentMediaResult]):
     name = "get_current_media"
-    description = "Read current media title, artist, album, source, and status."
+    description = (
+        "Report what media is playing and its playback status. Observation only; playback commands "
+        "use control_media."
+    )
     arguments_type = NoArguments
     result_type = CurrentMediaResult
     risk_level = RiskLevel.LOW
@@ -1055,7 +1066,10 @@ class WaitMsTool(Tool[WaitArguments, WaitResult]):
 
 class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
     name = "get_foreground_window"
-    description = "Return the current foreground window."
+    description = (
+        "Identify the focused desktop window when the user asks which window is focused. "
+        "Observation only; not a prerequisite for named window actions."
+    )
     arguments_type = NoArguments
     result_type = WindowResult
     risk_level = RiskLevel.LOW
@@ -1070,7 +1084,10 @@ class GetForegroundWindowTool(WindowsToolBase, Tool[NoArguments, WindowResult]):
 
 class ListOpenWindowsTool(WindowsToolBase, Tool[ListWindowsArguments, WindowsResult]):
     name = "list_open_windows"
-    description = "Live-check desktop windows by app/title or monitor; includes minimized windows."
+    description = (
+        "Check whether desktop windows are open; includes minimized windows. Does not control, "
+        "move, or inspect window contents."
+    )
     arguments_type = ListWindowsArguments
     result_type = WindowsResult
     risk_level = RiskLevel.LOW
@@ -1138,7 +1155,10 @@ class MoveNamedWindowToMonitorTool(
     WindowsToolBase, Tool[MoveNamedWindowArguments, WindowActionResult]
 ):
     name = "move_named_window_to_monitor"
-    description = "Move one open window by monitor relation, number, or display name."
+    description = (
+        "Move a named open window directly to a supplied monitor relation, number, or display name; "
+        "no preliminary layout call is needed."
+    )
     arguments_type = MoveNamedWindowArguments
     result_type = WindowActionResult
     risk_level = RiskLevel.MEDIUM
@@ -1209,7 +1229,10 @@ class MoveNamedWindowToMonitorTool(
 
 class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
     name = "get_monitor_layout"
-    description = "Return monitor numbers, names, bounds, primary status, and relative positions."
+    description = (
+        "Report monitor layout. Use only when the layout or destination is unknown; do not call before "
+        "a direct move with a supplied destination."
+    )
     arguments_type = NoArguments
     result_type = MonitorsResult
     risk_level = RiskLevel.LOW
@@ -1224,7 +1247,9 @@ class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
 class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, WindowActionResult]):
     name = "control_named_window"
     description = (
-        "Control a desktop window, including personal Chrome; excludes the managed browser."
+        "Focus, minimize, maximize, restore, or close a named ordinary desktop window directly. "
+        "Includes personal Chrome; never controls Wyzer's managed browser; no preliminary window "
+        "check is needed."
     )
     arguments_type = NamedWindowActionArguments
     result_type = WindowActionResult

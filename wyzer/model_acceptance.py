@@ -18,13 +18,12 @@ from wyzer.tasks.tools import task_native_tools
 from wyzer.tools import create_default_registry
 from wyzer.tools.capabilities import (
     ACTIVATE_CAPABILITY_TOOL,
-    CAPABILITY_COORDINATION_TOOLS,
     LIST_CAPABILITIES_TOOL,
 )
 
 
 class AcceptanceCase(BaseModel):
-    """One expected first decision from the configured chat model."""
+    """One expected decision or short direct sequence from the configured model."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -90,7 +89,8 @@ async def evaluate(
         },
         enabled_entrypoint_packs=settings.tool_packs.enabled,
     )
-    default_tools = [*registry.native_tools(), *task_native_tools()]
+    initial_task_tools = task_native_tools(active_plan=False)
+    default_tools = [*registry.native_tools(), *initial_task_tools]
     available_tools = {tool.function.name for tool in default_tools}
     all_available_tools = {
         *(tool.function.name for tool in registry.all_native_tools()),
@@ -123,12 +123,14 @@ async def evaluate(
             ]
             activated: set[str] = set()
             trace: list[str] = []
+            direct_sequence: list[str] = []
             actual: list[str] = []
             response_text = ""
             for _ in range(6):
+                capability_tools = registry.model_view(activated).native_tools()
                 tools = [
-                    *registry.model_view(activated).native_tools(),
-                    *task_native_tools(),
+                    *capability_tools,
+                    *initial_task_tools,
                 ]
                 offered = {tool.function.name for tool in tools}
                 response = await provider.chat(messages, tools)
@@ -137,7 +139,7 @@ async def evaluate(
                 trace.extend(names)
                 response_text = (response.message.content or "").strip()
                 if not calls:
-                    actual = []
+                    actual = direct_sequence
                     break
 
                 # Core expectations must remain direct; only specialized expectations may
@@ -146,7 +148,7 @@ async def evaluate(
                     case.expected_tools and not set(case.expected_tools).issubset(available_tools)
                 )
                 if not expected_is_specialized and any(
-                    name in CAPABILITY_COORDINATION_TOOLS for name in names
+                    registry.is_capability_coordination_tool(name) for name in names
                 ):
                     actual = names
                     break
@@ -171,27 +173,37 @@ async def evaluate(
                         )
                     continue
 
-                if all(name == ACTIVATE_CAPABILITY_TOOL for name in names):
+                if all(
+                    name == ACTIVATE_CAPABILITY_TOOL
+                    or registry.activation_capability(name) is not None
+                    for name in names
+                ):
                     activation_failed = False
                     for call in calls:
-                        name = str(call.function.arguments.get("name") or "")
-                        if name not in registry.available_capabilities():
+                        capability = (
+                            str(call.function.arguments.get("name") or "")
+                            if call.function.name == ACTIVATE_CAPABILITY_TOOL
+                            else registry.activation_capability(call.function.name) or ""
+                        )
+                        if capability not in registry.available_capabilities():
                             activation_failed = True
                             payload_data = {
                                 "ok": False,
                                 "error": {
                                     "code": "UNKNOWN_CAPABILITY",
-                                    "message": f"No activatable capability named {name}.",
+                                    "message": f"No activatable capability named {capability}.",
                                 },
                             }
                         else:
-                            activated.add(name)
+                            activated.add(capability)
                             payload_data = {
                                 "ok": True,
                                 "data": {
-                                    "name": name,
+                                    "name": capability,
                                     "instruction": (
-                                        "Use the newly available tools on the next native round."
+                                        "Activation is complete but performed no action. Continue the "
+                                        "original request now with the matching newly available action "
+                                        "or observation tool."
                                     ),
                                 },
                             }
@@ -237,10 +249,45 @@ async def evaluate(
                         )
                     continue
 
+                if len(case.expected_tools) > 1:
+                    candidate = [*direct_sequence, *names]
+                    expected_prefix = case.expected_tools[: len(candidate)]
+                    if candidate == case.expected_tools:
+                        actual = candidate
+                        break
+                    if candidate == expected_prefix and not any(
+                        name in case.forbidden_tools for name in names
+                    ):
+                        direct_sequence = candidate
+                        for call in calls:
+                            messages.append(
+                                ChatMessage(
+                                    role="tool",
+                                    name=call.function.name,
+                                    tool_call_id=call.id,
+                                    content=json.dumps(
+                                        {
+                                            "ok": True,
+                                            "data": {
+                                                "simulated": True,
+                                                "instruction": (
+                                                    "This action succeeded in the read-only acceptance "
+                                                    "simulation. Continue any remaining requested action."
+                                                ),
+                                            },
+                                        },
+                                        separators=(",", ":"),
+                                    ),
+                                )
+                            )
+                        continue
+                    actual = candidate
+                    break
+
                 actual = names
                 break
             else:
-                actual = trace[-1:]
+                actual = direct_sequence or trace[-1:]
 
             forbidden_seen = [name for name in actual if name in case.forbidden_tools]
             passed = actual == case.expected_tools and not forbidden_seen
@@ -305,7 +352,7 @@ def _print_summary(report: AcceptanceReport) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Evaluate the configured model's first tool decision without executing any tools."
+            "Evaluate configured model tool decisions without executing any tools."
         )
     )
     parser.add_argument("--config", type=Path, default=Path("wyzer.toml"))

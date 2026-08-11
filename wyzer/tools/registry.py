@@ -16,6 +16,11 @@ from wyzer.models import (
     ToolDefinition,
 )
 from wyzer.tools.base import Tool
+from wyzer.tools.capabilities import (
+    ACTIVATE_CAPABILITY_TOOL,
+    LIST_CAPABILITIES_TOOL,
+    CapabilityActivationTool,
+)
 from wyzer.tools.schema import model_parameters
 
 if TYPE_CHECKING:
@@ -73,6 +78,9 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool[Any, Any]] = {}
         self._packs: dict[str, tuple[str, ...]] = {}
+        self._pack_descriptions: dict[str, str] = {}
+        self._pack_activation_names: dict[str, str] = {}
+        self._capability_activators: dict[str, str] = {}
         self._tool_to_pack: dict[str, str | None] = {}
         self._default_capabilities: set[str] = set()
 
@@ -107,6 +115,10 @@ class ToolRegistry:
         if not tools:
             raise InvalidToolPackError(f"tool pack {pack_name} did not create any tools")
         self._register_many(tools, pack_name=pack_name)
+        self._pack_descriptions[pack_name] = str(getattr(pack, "description", "")).strip()
+        self._pack_activation_names[pack_name] = str(
+            getattr(pack, "activation_name", "") or pack_name
+        ).strip()
         if default_visible:
             self._default_capabilities.add(pack_name)
 
@@ -172,6 +184,7 @@ class ToolRegistry:
         return [
             {
                 "name": pack_name,
+                "description": self._pack_descriptions[pack_name],
                 "tools": list(self._packs[pack_name]),
                 "count": len(self._packs[pack_name]),
             }
@@ -215,6 +228,37 @@ class ToolRegistry:
             )
         )
 
+    def finalize_capability_activation_surface(self) -> None:
+        """Generate one zero-argument activator per optional registered pack."""
+        if self._capability_activators:
+            return
+        tools: list[CapabilityActivationTool] = []
+        for pack_name in self.available_capabilities():
+            if pack_name in self._default_capabilities:
+                continue
+            tool_name = f"activate_{self._pack_activation_names[pack_name]}_tools"
+            tools.append(
+                CapabilityActivationTool(
+                    name=tool_name,
+                    capability_name=pack_name,
+                    capability_description=self._pack_descriptions[pack_name],
+                )
+            )
+            self._capability_activators[tool_name] = pack_name
+        self._register_many(tuple(tools), pack_name=None)
+        self._tools[LIST_CAPABILITIES_TOOL].llm_visible = False
+        self._tools[ACTIVATE_CAPABILITY_TOOL].llm_visible = False
+
+    def activation_capability(self, tool_name: str) -> str | None:
+        return self._capability_activators.get(tool_name)
+
+    def is_capability_coordination_tool(self, tool_name: str) -> bool:
+        return tool_name in {
+            LIST_CAPABILITIES_TOOL,
+            ACTIVATE_CAPABILITY_TOOL,
+            *self._capability_activators,
+        }
+
     def capability_manifest(
         self, activated_capabilities: Iterable[str] = ()
     ) -> list[dict[str, Any]]:
@@ -223,6 +267,7 @@ class ToolRegistry:
         return [
             {
                 "name": pack_name,
+                "description": self._pack_descriptions[pack_name],
                 "tool_count": sum(
                     self._tools[name].available
                     and bool(getattr(self._tools[name], "llm_visible", True))
@@ -247,6 +292,19 @@ class ToolRegistry:
     ) -> list[NativeToolDefinition]:
         """Build native definitions from registered schemas for one validated view."""
         capability_set = set(capabilities)
+        coordination_order = {
+            "list_tool_capabilities": 0,
+            "activate_tool_capability": 1,
+        }
+        definitions = sorted(
+            self.definitions(),
+            key=lambda definition: (
+                0
+                if definition.name in self._capability_activators
+                else coordination_order.get(definition.name, 2),
+                definition.name,
+            ),
+        )
         return [
             NativeToolDefinition(
                 function=NativeFunctionDefinition(
@@ -255,7 +313,7 @@ class ToolRegistry:
                     parameters=model_parameters(self._tools[definition.name].arguments_type),
                 )
             )
-            for definition in self.definitions()
+            for definition in definitions
             if definition.available
             and bool(getattr(self._tools[definition.name], "llm_visible", True))
             and (

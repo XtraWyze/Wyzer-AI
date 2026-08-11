@@ -23,7 +23,7 @@ def measure(activated_capabilities: tuple[str, ...] = ()) -> dict[str, Any]:
     view = registry.model_view(activated_capabilities)
     capability_tools = view.native_tools()
     all_capability_tools = registry.all_native_tools()
-    task_tools = task_native_tools()
+    task_tools = task_native_tools(active_plan=False)
     tools = [*capability_tools, *task_tools]
     all_tools = [*all_capability_tools, *task_tools]
 

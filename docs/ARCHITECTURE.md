@@ -46,11 +46,16 @@ routine requests do not pay a discovery round. Browser, clipboard, desktop inter
 diagnostics, files, perception, and enabled third-party packs are activated on demand. There is no
 keyword/regex capability router and no second planner model.
 
-For requests requiring multiple distinct computer actions, the same chat model can call the
-orchestrator-owned `task_plan_create`, `task_step_update`, and `task_plan_revise` functions. These
-are state operations, not a second planner model or deterministic intent router. The orchestrator
-attaches real tool results to the current step and rejects a verified transition unless qualifying
-evidence exists. An active plan also prevents unsupported final completion text.
+For longer work with meaningful dependencies, intermediate artifacts, retries, recovery, or
+cross-step verification, the same chat model can call the orchestrator-owned `task_plan_create`,
+`task_step_update`, and `task_plan_revise` functions. Small immediately executable sequences can
+instead return several ordinary native calls, which execute sequentially through the same guarded
+tool path. Each direct call retains registry validation, confirmation, isolation, cancellation, and
+separate evidence. A failure stops the remaining returned calls for model reassessment, while a
+confirmation boundary preserves but does not execute the tail until confirmation succeeds. These
+are model decisions, not a second planner model or deterministic intent router. For planned work,
+the orchestrator attaches real tool results to the current step and rejects a verified transition
+unless qualifying evidence exists. An active plan also prevents unsupported final completion text.
 
 ## Package responsibilities
 

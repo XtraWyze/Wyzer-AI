@@ -44,10 +44,16 @@ TASK_ARGUMENT_TYPES: dict[str, type[ToolArguments]] = {
 }
 
 
-def task_native_tools() -> list[NativeToolDefinition]:
+def task_native_tools(*, active_plan: bool | None = None) -> list[NativeToolDefinition]:
+    """Return task tools relevant to the current plan state.
+
+    ``None`` retains the full diagnostic/test view. Before a plan exists the model
+    only needs creation; while one is active it only needs update and revision.
+    """
     descriptions = {
         "task_plan_create": (
-            "First and only call for requests needing 2+ distinct computer actions; not for one action."
+            "Use first for complex work with dependencies, intermediate artifacts, retries, recovery, "
+            "or cross-step verification. Small immediate sequences use direct tools."
         ),
         "task_step_update": (
             "Update the current step from evidence; verified requires observed or explicit success."
@@ -56,6 +62,12 @@ def task_native_tools() -> list[NativeToolDefinition]:
             "Replace unfinished steps when evidence requires a new approach."
         ),
     }
+    if active_plan is None:
+        names = tuple(TASK_ARGUMENT_TYPES)
+    elif active_plan:
+        names = ("task_step_update", "task_plan_revise")
+    else:
+        names = ("task_plan_create",)
     return [
         NativeToolDefinition(
             function=NativeFunctionDefinition(
@@ -64,5 +76,6 @@ def task_native_tools() -> list[NativeToolDefinition]:
                 parameters=model_parameters(arguments_type),
             )
         )
-        for name, arguments_type in TASK_ARGUMENT_TYPES.items()
+        for name in names
+        for arguments_type in (TASK_ARGUMENT_TYPES[name],)
     ]

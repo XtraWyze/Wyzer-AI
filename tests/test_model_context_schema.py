@@ -10,7 +10,12 @@ from wyzer.tasks.tools import TASK_ARGUMENT_TYPES, task_native_tools
 from wyzer.tools import create_default_registry
 
 EXPECTED_MODEL_TOOL_NAMES = {
-    "activate_tool_capability",
+    "activate_clipboard_tools",
+    "activate_desktop_interaction_tools",
+    "activate_diagnostics_tools",
+    "activate_file_tools",
+    "activate_managed_browser_tools",
+    "activate_screen_perception_tools",
     "activate_visual_target",
     "browser_click",
     "browser_close_tab",
@@ -43,7 +48,6 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "list_directory",
     "list_installed_games",
     "list_open_windows",
-    "list_tool_capabilities",
     "move_named_window_to_monitor",
     "move_path",
     "mute_all_audio_except",
@@ -64,7 +68,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "type_desktop_text",
     "write_clipboard",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "896a69134f7ef95b639b7b4661477141c7c3f7ba2f8ac9bf29e8f65145d7bd4f"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "ee4245352768fd740baced57a31417da4b8b2819fa15696ae41996e85dd5437b"
 
 
 def _semantic_schema(value: Any) -> Any:
@@ -120,6 +124,16 @@ def test_native_tool_schemas_are_json_valid_and_omit_only_display_titles() -> No
         assert tool.function.parameters.get("type") == "object"
 
 
+def test_task_tool_view_is_scoped_to_plan_state() -> None:
+    assert [tool.function.name for tool in task_native_tools(active_plan=False)] == [
+        "task_plan_create"
+    ]
+    assert [tool.function.name for tool in task_native_tools(active_plan=True)] == [
+        "task_step_update",
+        "task_plan_revise",
+    ]
+
+
 def test_media_action_schema_explains_skip_direction_to_the_model() -> None:
     tool = next(
         tool
@@ -129,3 +143,17 @@ def test_media_action_schema_explains_skip_direction_to_the_model() -> None:
     action = tool.function.parameters["properties"]["action"]
 
     assert "Use next when the user says skip" in action["description"]
+
+
+def test_default_tool_descriptions_reject_near_match_fallbacks() -> None:
+    registry = create_default_registry()
+    tools = {
+        tool.function.name: tool.function.description
+        for tool in registry.native_tools()
+    }
+    all_tools = {tool.function.name: tool.function.description for tool in registry.all_native_tools()}
+
+    assert "Never use to find a file" in tools["search_installed_applications"]
+    assert "activate the files capability" in all_tools["open_file"]
+    assert "never use it to close a browser" in tools["control_media"]
+    assert "no preliminary window check is needed" in tools["control_named_window"]

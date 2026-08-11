@@ -1,11 +1,14 @@
 # LLM-driven task engine
 
-Wyzer uses the task engine only when a request needs two or more distinct computer actions.
-Conversation, questions, and single routine actions keep the direct native-tool path.
+Wyzer uses the task engine for longer complex work with meaningful dependencies, intermediate
+outcomes or artifacts, retries, recovery, or cross-step verification. Small immediately executable
+sequences can use several ordinary native calls in returned order without persistent task state.
+Needing more than one tool call does not by itself require a plan.
 
 The primary chat model silently authors outcome-focused steps with success criteria. It uses the
 same conversation to act, inspect results, revise an approach, and summarize the outcome. There is
 no keyword intent router, command tree, separate planner model, or scripted workflow language.
+The same model decides whether direct calls or persistent planning fit the work.
 
 ## State and evidence
 

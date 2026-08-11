@@ -58,6 +58,57 @@ def test_model_view_can_only_activate_registered_capability_packs() -> None:
         registry.model_view(("imaginary",))
 
 
+def test_capability_manifest_explains_what_optional_pack_does() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack("special", (EchoTool,), "Handle specialized echo operations."),
+        default_visible=False,
+    )
+
+    assert registry.capability_manifest() == [
+        {
+            "name": "special",
+            "description": "Handle specialized echo operations.",
+            "tool_count": 1,
+            "active": False,
+        }
+    ]
+
+
+def test_capability_coordination_tools_come_first_in_model_view() -> None:
+    from wyzer.tools import create_default_registry
+
+    names = create_default_registry().model_view().tool_names
+
+    assert names[:6] == (
+        "activate_clipboard_tools",
+        "activate_desktop_interaction_tools",
+        "activate_diagnostics_tools",
+        "activate_file_tools",
+        "activate_managed_browser_tools",
+        "activate_screen_perception_tools",
+    )
+
+
+def test_generated_activators_are_zero_argument_metadata_mappings() -> None:
+    from wyzer.tools import create_default_registry
+
+    registry = create_default_registry()
+    activators = {
+        tool.function.name: tool
+        for tool in registry.native_tools()
+        if registry.activation_capability(tool.function.name) is not None
+    }
+
+    assert registry.activation_capability("activate_managed_browser_tools") == "browser"
+    assert registry.activation_capability("activate_file_tools") == "files"
+    assert all(tool.function.parameters["properties"] == {} for tool in activators.values())
+    assert all("required" not in tool.function.parameters for tool in activators.values())
+    assert all("Does not perform the user's action" in tool.function.description for tool in activators.values())
+    assert "list_tool_capabilities" not in registry.model_view().tool_names
+    assert "activate_tool_capability" not in registry.model_view().tool_names
+
+
 def test_capability_view_preserves_visibility_confirmation_and_validation() -> None:
     class HiddenEchoTool(EchoTool):
         name = "hidden_echo"

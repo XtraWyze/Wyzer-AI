@@ -47,6 +47,7 @@ class FailingTool(EchoTool):
 
 
 class VerifiedActionData(BaseModel):
+    message: str
     changed: bool = True
     evidence: dict[str, str] = {
         "verification_status": "verified",
@@ -63,8 +64,8 @@ class VerifiedActionTool(Tool[EchoArguments, VerifiedActionData]):
     read_only = False
 
     def execute(self, arguments: EchoArguments, context: ToolContext) -> VerifiedActionData:
-        del arguments, context
-        return VerifiedActionData()
+        del context
+        return VerifiedActionData(message=arguments.message)
 
 
 class ApplicationArguments(ToolArguments):

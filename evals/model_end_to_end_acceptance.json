@@ -1,0 +1,501 @@
+[
+  {
+    "case_id": "move_named_window_e2e",
+    "requested_goal": "Move the Notepad window to the monitor on the right.",
+    "allowed_tool_paths": [
+      ["move_named_window_to_monitor"],
+      ["get_monitor_layout", "move_named_window_to_monitor"],
+      ["list_open_windows", "move_named_window_to_monitor"],
+      ["get_monitor_layout", "list_open_windows", "move_named_window_to_monitor"],
+      ["list_open_windows", "get_monitor_layout", "move_named_window_to_monitor"]
+    ],
+    "prohibited_tools": ["task_plan_create"],
+    "required_final_outcome": "The Notepad window is moved to the right-hand monitor.",
+    "outcomes": [
+      {
+        "name": "notepad_moved_right",
+        "required_tools": [
+          {
+            "tool": "move_named_window_to_monitor",
+            "argument_options": {
+              "window": ["Notepad", "notepad.exe", "Untitled - Notepad"],
+              "destination": ["right", "monitor 2", "monitor on the right", "the monitor on the right"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 4,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["move_named_window_to_monitor"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 1,
+      "unnecessary_observation_tools": ["get_monitor_layout", "list_open_windows"]
+    },
+    "mock_results": {
+      "get_monitor_layout": {
+        "count": 2,
+        "monitors": [
+          {"number": 1, "primary": true, "left": 0, "right": 1920},
+          {"number": 2, "primary": false, "left": 1920, "right": 3840}
+        ]
+      },
+      "list_open_windows": {
+        "count": 1,
+        "windows": [{"application": "notepad.exe", "title": "Untitled - Notepad"}]
+      },
+      "move_named_window_to_monitor": {
+        "window": "Notepad",
+        "destination": "right",
+        "verified": true
+      }
+    }
+  },
+  {
+    "case_id": "personal_chrome_close_e2e",
+    "requested_goal": "Close my personal Chrome window.",
+    "allowed_tool_paths": [
+      ["control_named_window"],
+      ["get_foreground_window", "control_named_window"],
+      ["list_open_windows", "control_named_window"]
+    ],
+    "prohibited_tools": ["browser_stop", "browser_close_tab", "task_plan_create"],
+    "required_final_outcome": "An ordinary personal Chrome window is closed, never Wyzer's managed browser.",
+    "outcomes": [
+      {
+        "name": "personal_chrome_closed",
+        "required_tools": [
+          {
+            "tool": "control_named_window",
+            "argument_options": {
+              "window": ["Chrome", "Google Chrome", "personal Chrome"],
+              "action": ["close"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 4,
+    "clarification": "forbidden",
+    "confirmation": "required",
+    "efficiency": {
+      "ideal_first_tools": ["control_named_window"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 1,
+      "unnecessary_observation_tools": ["get_foreground_window", "list_open_windows"]
+    },
+    "mock_results": {
+      "get_foreground_window": {
+        "application": "chrome.exe",
+        "title": "Google Chrome",
+        "managed_browser": false
+      },
+      "list_open_windows": {
+        "count": 1,
+        "windows": [{"application": "chrome.exe", "title": "Google Chrome"}]
+      },
+      "control_named_window": {
+        "window": "Google Chrome",
+        "action": "close",
+        "verified": true,
+        "managed_browser": false
+      }
+    }
+  },
+  {
+    "case_id": "ambiguous_chrome_close_e2e",
+    "requested_goal": "Close Chrome.",
+    "allowed_tool_paths": [
+      [],
+      ["get_foreground_window"],
+      ["get_foreground_window", "control_named_window"]
+    ],
+    "prohibited_tools": ["browser_stop", "browser_close_tab", "task_plan_create"],
+    "required_final_outcome": "Ask which Chrome context is intended, or inspect state that proves the foreground window is personal Chrome and close that window.",
+    "outcomes": [
+      {
+        "name": "clarification_requested",
+        "clarification": true
+      },
+      {
+        "name": "foreground_personal_chrome_closed",
+        "required_tools": [
+          {
+            "tool": "control_named_window",
+            "argument_options": {
+              "window": ["Chrome", "Google Chrome", "personal Chrome"],
+              "action": ["close"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 4,
+    "clarification": "allowed",
+    "confirmation": "required_if_action",
+    "efficiency": {
+      "ideal_first_tools": [],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 0,
+      "unnecessary_observation_tools": ["get_foreground_window"]
+    },
+    "mock_results": {
+      "get_foreground_window": {
+        "application": "chrome.exe",
+        "title": "Google Chrome",
+        "managed_browser": false,
+        "resolution": "This is an ordinary personal Chrome window, not Wyzer's managed browser."
+      },
+      "control_named_window": {
+        "window": "Google Chrome",
+        "action": "close",
+        "verified": true,
+        "managed_browser": false
+      }
+    }
+  },
+  {
+    "case_id": "search_known_file_e2e",
+    "requested_goal": "Find a file named quarterly-notes.txt on this computer.",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "search_files"]
+    ],
+    "prohibited_tools": ["open_file", "task_plan_create"],
+    "required_final_outcome": "The requested filename is searched for using registered file tools.",
+    "outcomes": [
+      {
+        "name": "file_found",
+        "required_tools": [
+          {
+            "tool": "search_files",
+            "argument_options": {"query": ["quarterly-notes.txt"]}
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {
+      "search_files": {
+        "query": "quarterly-notes.txt",
+        "count": 1,
+        "matches": [{"path": "C:\\Users\\Public\\quarterly-notes.txt"}]
+      }
+    }
+  },
+  {
+    "case_id": "read_known_file_e2e",
+    "requested_goal": "Read the text file C:\\Users\\Public\\notes.txt.",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "read_text_file"]
+    ],
+    "prohibited_tools": ["open_file", "task_plan_create"],
+    "required_final_outcome": "The contents of the exact known file are read.",
+    "outcomes": [
+      {
+        "name": "known_file_read",
+        "required_tools": [
+          {
+            "tool": "read_text_file",
+            "argument_options": {"path": ["C:\\Users\\Public\\notes.txt"]}
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {
+      "read_text_file": {
+        "path": "C:\\Users\\Public\\notes.txt",
+        "content": "Controlled acceptance file contents.",
+        "truncated": false
+      }
+    }
+  },
+  {
+    "case_id": "delete_known_file_e2e",
+    "requested_goal": "Delete C:\\Users\\Public\\old-notes.txt by moving it to the Recycle Bin.",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "delete_path"]
+    ],
+    "prohibited_tools": ["task_plan_create"],
+    "required_final_outcome": "The exact file reaches the existing confirmation boundary and is then simulated as recycled.",
+    "outcomes": [
+      {
+        "name": "known_file_recycled",
+        "required_tools": [
+          {
+            "tool": "delete_path",
+            "argument_options": {"path": ["C:\\Users\\Public\\old-notes.txt"]}
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "required",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {
+      "delete_path": {
+        "path": "C:\\Users\\Public\\old-notes.txt",
+        "operation": "delete",
+        "recycled": true
+      }
+    }
+  },
+  {
+    "case_id": "click_retry_e2e",
+    "requested_goal": "Click the Retry button.",
+    "allowed_tool_paths": [
+      ["activate_screen_perception_tools", "activate_visual_target"],
+      ["activate_screen_perception_tools", "inspect_screen", "activate_visual_target"]
+    ],
+    "prohibited_tools": ["click_desktop_element", "task_plan_create"],
+    "required_final_outcome": "The visible Retry target is clicked; inspection alone is not completion.",
+    "outcomes": [
+      {
+        "name": "retry_clicked",
+        "required_tools": [
+          {
+            "tool": "activate_visual_target",
+            "argument_options": {
+              "query": ["Retry", "Retry button", "the Retry button"],
+              "action": ["click"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_screen_perception_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": ["inspect_screen"]
+    },
+    "mock_results": {
+      "inspect_screen": {
+        "description": "A Retry button is visible in the focused window.",
+        "targets": [{"label": "Retry", "visible": true}]
+      },
+      "activate_visual_target": {
+        "target": "Retry",
+        "action": "click",
+        "verified": true
+      }
+    }
+  },
+  {
+    "case_id": "simple_open_type_e2e",
+    "requested_goal": "Open Notepad and type hello.",
+    "allowed_tool_paths": [
+      ["open_application", "activate_desktop_interaction_tools", "type_desktop_text"],
+      ["activate_desktop_interaction_tools", "open_application", "type_desktop_text"]
+    ],
+    "prohibited_tools": ["task_plan_create"],
+    "required_final_outcome": "Notepad is opened and hello is typed into it.",
+    "outcomes": [
+      {
+        "name": "notepad_opened_and_typed",
+        "required_tools": [
+          {
+            "tool": "open_application",
+            "argument_options": {"application": ["Notepad"]}
+          },
+          {
+            "tool": "type_desktop_text",
+            "argument_options": {
+              "text": ["hello"],
+              "target_window": ["Notepad", "Untitled - Notepad"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["open_application", "activate_desktop_interaction_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 3,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {
+      "open_application": {"application": "Notepad", "verified": true},
+      "type_desktop_text": {"target_window": "Notepad", "typed": true, "characters": 5}
+    }
+  },
+  {
+    "case_id": "simple_open_volume_e2e",
+    "requested_goal": "Open Calculator and turn the computer volume down.",
+    "allowed_tool_paths": [
+      ["open_application", "control_master_audio"]
+    ],
+    "prohibited_tools": ["task_plan_create"],
+    "required_final_outcome": "Calculator is opened and master volume is decreased.",
+    "outcomes": [
+      {
+        "name": "calculator_opened_and_volume_lowered",
+        "required_tools": [
+          {
+            "tool": "open_application",
+            "argument_options": {"application": ["Calculator", "calc"]}
+          },
+          {
+            "tool": "control_master_audio",
+            "argument_options": {"operation": ["decrease"]}
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 4,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["open_application"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {
+      "open_application": {"application": "Calculator", "verified": true},
+      "control_master_audio": {"operation": "decrease", "previous_level": 50, "level": 40}
+    }
+  },
+  {
+    "case_id": "simple_open_move_e2e",
+    "requested_goal": "Open Calculator and move it to monitor two.",
+    "allowed_tool_paths": [
+      ["open_application", "move_named_window_to_monitor"],
+      ["open_application", "get_monitor_layout", "move_named_window_to_monitor"]
+    ],
+    "prohibited_tools": ["task_plan_create"],
+    "required_final_outcome": "Calculator is opened and its window is moved to monitor two.",
+    "outcomes": [
+      {
+        "name": "calculator_opened_and_moved",
+        "required_tools": [
+          {
+            "tool": "open_application",
+            "argument_options": {"application": ["Calculator", "calc"]}
+          },
+          {
+            "tool": "move_named_window_to_monitor",
+            "argument_options": {
+              "window": ["Calculator"],
+              "destination": ["2", "two", "monitor 2", "monitor two"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["open_application"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": ["get_monitor_layout"]
+    },
+    "mock_results": {
+      "open_application": {"application": "Calculator", "verified": true},
+      "get_monitor_layout": {
+        "count": 2,
+        "monitors": [
+          {"number": 1, "primary": true, "left": 0, "right": 1920},
+          {"number": 2, "primary": false, "left": 1920, "right": 3840}
+        ]
+      },
+      "move_named_window_to_monitor": {
+        "window": "Calculator",
+        "destination": "2",
+        "verified": true
+      }
+    }
+  },
+  {
+    "case_id": "complex_report_chart_plan_e2e",
+    "requested_goal": "Find my latest sales report, extract the values, create a chart in Excel, save it, and verify the result.",
+    "allowed_tool_paths": [
+      ["task_plan_create"]
+    ],
+    "prohibited_tools": ["search_files", "open_application"],
+    "required_final_outcome": "A meaningful persistent plan is created before extended execution.",
+    "outcomes": [
+      {
+        "name": "dependency_aware_plan_created",
+        "required_tools": [{"tool": "task_plan_create"}]
+      }
+    ],
+    "maximum_model_rounds": 2,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["task_plan_create"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 1,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {},
+    "plan_expectations": {
+      "minimum_steps": 4,
+      "require_distinct_steps": true,
+      "require_success_criteria": true
+    }
+  },
+  {
+    "case_id": "complex_research_document_plan_e2e",
+    "requested_goal": "Search for several sources, compare them, create a document, save it, and verify the result.",
+    "allowed_tool_paths": [
+      ["task_plan_create"]
+    ],
+    "prohibited_tools": ["browser_search_web", "open_application"],
+    "required_final_outcome": "A meaningful persistent plan is created before extended execution.",
+    "outcomes": [
+      {
+        "name": "dependency_aware_plan_created",
+        "required_tools": [{"tool": "task_plan_create"}]
+      }
+    ],
+    "maximum_model_rounds": 2,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["task_plan_create"],
+      "ideal_provider_rounds": 1,
+      "ideal_tool_calls": 1,
+      "unnecessary_observation_tools": []
+    },
+    "mock_results": {},
+    "plan_expectations": {
+      "minimum_steps": 4,
+      "require_distinct_steps": true,
+      "require_success_criteria": true
+    }
+  }
+]

@@ -46,7 +46,9 @@ def test_registry_registers_named_pack_and_tracks_ownership() -> None:
     assert registry.pack_tools("example") == ("echo",)
     assert registry.tool_pack("echo") == "example"
     assert registry.compact_manifest()[0]["pack"] == "example"
-    assert registry.pack_manifest() == [{"name": "example", "tools": ["echo"], "count": 1}]
+    assert registry.pack_manifest() == [
+        {"name": "example", "description": "", "tools": ["echo"], "count": 1}
+    ]
 
 
 def test_pack_registration_is_atomic_when_one_tool_conflicts() -> None:
@@ -128,6 +130,8 @@ def test_default_factory_composes_builtin_and_extra_packs() -> None:
     )
     assert registry.tool_pack("echo") == "example"
     assert registry.tool_pack("open_application") == "applications"
+    assert registry.tool_pack("open_file") == "applications"
+    assert registry.tool_pack("get_foreground_window") == "windows"
     assert registry.tool_pack("search_files") == "files"
 
 
@@ -141,11 +145,19 @@ def test_default_model_view_keeps_basic_actions_and_scopes_specialized_packs() -
         "control_application_audio",
         "control_named_window",
         "move_named_window_to_monitor",
-        "list_tool_capabilities",
-        "activate_tool_capability",
+        "activate_managed_browser_tools",
+        "activate_file_tools",
+        "activate_clipboard_tools",
+        "activate_screen_perception_tools",
     } <= default_names
-    assert {"browser_search_web", "search_files", "inspect_screen"}.isdisjoint(default_names)
-    assert {"browser_search_web", "search_files", "inspect_screen"} <= all_names
+    assert {"list_tool_capabilities", "activate_tool_capability"}.isdisjoint(default_names)
+    optional = {
+        "browser_search_web",
+        "search_files",
+        "inspect_screen",
+    }
+    assert optional.isdisjoint(default_names)
+    assert optional <= all_names
 
 
 def test_entrypoint_packs_load_only_when_explicitly_enabled(

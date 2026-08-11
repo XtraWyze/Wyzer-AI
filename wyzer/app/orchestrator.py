@@ -42,7 +42,6 @@ from wyzer.tasks.tools import TASK_ARGUMENT_TYPES, task_native_tools
 from wyzer.tools import ModelToolView, ToolRegistry
 from wyzer.tools.capabilities import (
     ACTIVATE_CAPABILITY_TOOL,
-    CAPABILITY_COORDINATION_TOOLS,
     LIST_CAPABILITIES_TOOL,
 )
 from wyzer.tools.registry import (
@@ -359,7 +358,8 @@ class Orchestrator:
             action_calls = [
                 call
                 for call in message.tool_calls
-                if call.function.name not in {*TASK_ARGUMENT_TYPES, *CAPABILITY_COORDINATION_TOOLS}
+                if call.function.name not in TASK_ARGUMENT_TYPES
+                and not self.registry.is_capability_coordination_tool(call.function.name)
             ]
             if action_calls and tool_rounds >= self._maximum_tool_rounds:
                 return self._finish_response(
@@ -478,39 +478,6 @@ class Orchestrator:
         if completed:
             self._reject_post_completion_calls(calls, action_id)
             return None
-        action_calls = [
-            call
-            for call in calls
-            if call.function.name not in {*TASK_ARGUMENT_TYPES, *CAPABILITY_COORDINATION_TOOLS}
-        ]
-        creates = [call for call in calls if call.function.name == "task_plan_create"]
-        plan = self._tasks.snapshot() if self._tasks is not None else None
-        has_current_plan = bool(
-            plan is not None
-            and plan.action_id == action_id
-            and plan.status == TaskPlanStatus.ACTIVE
-        )
-        if (
-            self._tasks is not None
-            and len(action_calls) > 1
-            and not creates
-            and not has_current_plan
-        ):
-            for call in calls:
-                self._record_result(
-                    self._task_failure(
-                        call.function.name,
-                        action_id,
-                        uuid4(),
-                        "TASK_PLAN_REQUIRED",
-                        (
-                            "Multiple capability calls require a concise task plan. Call "
-                            "task_plan_create, then retry the capability calls."
-                        ),
-                    ),
-                    call.id,
-                )
-            return None
         # Some local models emit the capability call before task_plan_create in
         # one native-call batch. Establish the plan first so no action evidence
         # is lost, while preserving the model's order for every other call.
@@ -532,10 +499,20 @@ class Orchestrator:
             if call.function.name in TASK_ARGUMENT_TYPES:
                 result = self._execute_task_call(call, action_id, step_id)
                 self._record_result(result, call.id)
+                if not result.ok:
+                    self._skip_sequence_tail(
+                        ordered_calls[index + 1 :], action_id, failed=result
+                    )
+                    break
                 continue
-            if call.function.name in CAPABILITY_COORDINATION_TOOLS:
+            if self.registry.is_capability_coordination_tool(call.function.name):
                 result = self._execute_capability_call(call, action_id, step_id)
                 self._record_result(result, call.id, task_evidence=False)
+                if not result.ok:
+                    self._skip_sequence_tail(
+                        ordered_calls[index + 1 :], action_id, failed=result
+                    )
+                    break
                 continue
             if self._current_step_awaits_update(action_id):
                 result = self._task_failure(
@@ -550,7 +527,8 @@ class Orchestrator:
                     ),
                 )
                 self._record_result(result, call.id, task_evidence=False)
-                continue
+                self._skip_sequence_tail(ordered_calls[index + 1 :], action_id, failed=result)
+                break
             if self._current_step_needs_verification(action_id):
                 try:
                     candidate = self.registry.get(call.function.name, require_available=False)
@@ -569,7 +547,10 @@ class Orchestrator:
                         ),
                     )
                     self._record_result(result, call.id, task_evidence=False)
-                    continue
+                    self._skip_sequence_tail(
+                        ordered_calls[index + 1 :], action_id, failed=result
+                    )
+                    break
             validated, definition, invalid_result = self._validate_call(
                 call,
                 action_id,
@@ -578,7 +559,10 @@ class Orchestrator:
             )
             if invalid_result is not None:
                 self._record_result(invalid_result, call.id)
-                continue
+                self._skip_sequence_tail(
+                    ordered_calls[index + 1 :], action_id, failed=invalid_result
+                )
+                break
             assert validated is not None and definition is not None
             is_confirmed = index == 0 and confirmed_step is not None
             inspection = self._confirmation_inspection(call.function.name, validated)
@@ -604,7 +588,33 @@ class Orchestrator:
                 )
             result = await self._execute_tool(call, validated, action_id, step_id)
             self._record_result(result, call.id)
+            if not result.ok:
+                self._skip_sequence_tail(ordered_calls[index + 1 :], action_id, failed=result)
+                break
         return None
+
+    def _skip_sequence_tail(
+        self,
+        calls: list[NativeToolCall],
+        action_id: UUID,
+        *,
+        failed: ToolResult,
+    ) -> None:
+        """Return one structured non-execution result for each call after a failure."""
+        failed_code = failed.error.code if failed.error is not None else "TOOL_FAILED"
+        for call in calls:
+            result = self._task_failure(
+                call.function.name,
+                action_id,
+                uuid4(),
+                "SEQUENCE_STOPPED_AFTER_FAILURE",
+                (
+                    f"Not executed because the earlier {failed.tool} call failed. "
+                    "Reassess the request before retrying later actions."
+                ),
+                details={"failed_tool": failed.tool, "failed_code": failed_code},
+            )
+            self._record_result(result, call.id, task_evidence=False)
 
     def _completed_plan_for(self, action_id: UUID) -> bool:
         plan = self._tasks.snapshot() if self._tasks is not None else None
@@ -746,8 +756,14 @@ class Orchestrator:
                 data: dict[str, Any] = {
                     "capabilities": self.registry.capability_manifest(self._active_capabilities)
                 }
-            elif call.function.name == ACTIVATE_CAPABILITY_TOOL:
-                name = str(arguments.model_dump()["name"])
+            else:
+                name = (
+                    str(arguments.model_dump()["name"])
+                    if call.function.name == ACTIVATE_CAPABILITY_TOOL
+                    else self.registry.activation_capability(call.function.name)
+                )
+                if name is None:
+                    raise UnknownToolError(call.function.name)
                 if name not in self.registry.available_capabilities():
                     raise UnknownCapabilityError(name)
                 if name in self.registry.default_capabilities:
@@ -769,10 +785,11 @@ class Orchestrator:
                     "visible_tool_count": len(
                         self.registry.model_view(self._active_capabilities).native_tools()
                     ),
-                    "instruction": "Use the newly available tools on the next native round.",
+                    "instruction": (
+                        "Activation is complete but performed no action. Continue the original request "
+                        "now with the matching newly available action or observation tool."
+                    ),
                 }
-            else:
-                raise UnknownToolError(call.function.name)
         except UnknownCapabilityError as error:
             return self._local_failure(
                 call.function.name,
@@ -980,7 +997,8 @@ class Orchestrator:
         if (
             task_evidence
             and self._tasks is not None
-            and result.tool not in {*TASK_ARGUMENT_TYPES, *CAPABILITY_COORDINATION_TOOLS}
+            and result.tool not in TASK_ARGUMENT_TYPES
+            and not self.registry.is_capability_coordination_tool(result.tool)
         ):
             try:
                 read_only = self.registry.get(result.tool, require_available=False).read_only
@@ -1052,7 +1070,9 @@ class Orchestrator:
     ) -> Any:
         native_tools = self._model_tool_view().native_tools() if include_tools else []
         if include_tools and self._tasks is not None:
-            native_tools.extend(task_native_tools())
+            task_context = self._tasks.context()
+            task_tools = task_native_tools(active_plan=task_context is not None)
+            native_tools.extend(task_tools)
         settings = None
         if self._requests_detailed_response():
             settings = ChatRequestSettings(max_output_tokens=self._detailed_output_tokens)

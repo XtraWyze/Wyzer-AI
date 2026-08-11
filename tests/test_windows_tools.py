@@ -21,6 +21,12 @@ def test_default_registry_contains_all_builtin_tools() -> None:
     registry = create_default_registry(FakeWindowsBackend())
     expected = {
         "activate_tool_capability",
+        "activate_clipboard_tools",
+        "activate_desktop_interaction_tools",
+        "activate_diagnostics_tools",
+        "activate_file_tools",
+        "activate_managed_browser_tools",
+        "activate_screen_perception_tools",
         "get_system_profile",
         "diagnose_system",
         "open_application",

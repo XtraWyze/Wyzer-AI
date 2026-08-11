@@ -795,6 +795,11 @@ def _tool(
 def create_browser_pack() -> SimpleToolPack:
     return SimpleToolPack(
         name="browser",
+        description=(
+            "Wyzer's dedicated browser session—not ordinary user Chrome windows—for web navigation "
+            "and page interaction."
+        ),
+        activation_name="managed_browser",
         tool_factories=(
             lambda: _tool(
                 name="browser_start",
@@ -833,7 +838,9 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_open_url",
-                description=("Open an exact URL in managed Chrome; starts it automatically."),
+                description=(
+                    "Open an exact URL in Wyzer's managed browser; starts it automatically."
+                ),
                 arguments_type=OpenUrlArguments,
                 result_type=BrowserActionResult,
                 handler=_open_url,
@@ -842,7 +849,9 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_search_web",
-                description=("Search the web in managed Chrome; starts it automatically."),
+                description=(
+                    "Search the web in Wyzer's managed browser; starts it automatically."
+                ),
                 arguments_type=SearchWebArguments,
                 result_type=BrowserActionResult,
                 handler=_search_web,
@@ -851,7 +860,9 @@ def create_browser_pack() -> SimpleToolPack:
             ),
             lambda: _tool(
                 name="browser_inspect_page",
-                description=("Read the active page and return element refs for later interaction."),
+                description=(
+                    "Read the active page in Wyzer's managed browser and return refs for interaction."
+                ),
                 arguments_type=InspectPageArguments,
                 result_type=PageInspectionResult,
                 handler=_inspect,

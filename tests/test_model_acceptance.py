@@ -26,6 +26,15 @@ def test_model_acceptance_cases_are_valid_and_cover_key_routes() -> None:
     } <= expected_routes
     assert any(not case.expected_tools for case in cases)
     assert any("browser" in case.prompt.casefold() and not case.expected_tools for case in cases)
+    identifiers = {case.case_id for case in cases}
+    assert {
+        "open_known_file",
+        "identify_focused_window",
+        "simple_compound_open_and_type",
+        "simple_compound_open_and_move",
+        "complex_report_chart_plan",
+        "complex_research_document_plan",
+    } <= identifiers
 
 
 def test_model_acceptance_case_ids_must_be_unique(tmp_path: Path) -> None:
@@ -42,8 +51,7 @@ def test_acceptance_simulates_discovery_activation_and_final_decision(
 ) -> None:
     provider = FakeChatProvider(
         [
-            tool_response(("list_tool_capabilities", {})),
-            tool_response(("activate_tool_capability", {"name": "browser"})),
+            tool_response(("activate_managed_browser_tools", {})),
             tool_response(("browser_search_web", {"query": "local models"})),
         ]
     )
@@ -66,7 +74,38 @@ def test_acceptance_simulates_discovery_activation_and_final_decision(
 
     assert report.pass_rate == 1.0
     assert report.results[0].tool_trace == [
-        "list_tool_capabilities",
-        "activate_tool_capability",
+        "activate_managed_browser_tools",
         "browser_search_web",
     ]
+
+
+def test_acceptance_allows_multiple_direct_tools_for_simple_work(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeChatProvider(
+        [
+            tool_response(("open_application", {"application": "Calculator"})),
+            tool_response(("control_master_audio", {"operation": "decrease", "amount": 10})),
+        ]
+    )
+    monkeypatch.setattr("wyzer.model_acceptance.create_chat_provider", lambda *args: provider)
+    settings = WyzerSettings.load(CASES_PATH.parents[1] / "wyzer.toml")
+
+    report = asyncio.run(
+        evaluate(
+            settings,
+            [
+                AcceptanceCase(
+                    case_id="simple_direct_sequence",
+                    prompt="Do both small actions.",
+                    expected_tools=["open_application", "control_master_audio"],
+                    forbidden_tools=["task_plan_create"],
+                )
+            ],
+            minimum_pass_rate=1.0,
+        )
+    )
+
+    assert report.pass_rate == 1.0
+    assert report.results[0].actual_tools == ["open_application", "control_master_audio"]
+    assert report.results[0].tool_trace == ["open_application", "control_master_audio"]

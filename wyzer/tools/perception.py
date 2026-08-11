@@ -119,7 +119,8 @@ class WindowsPointerController:
 class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
     name = "inspect_screen"
     description = (
-        "Inspect visible screen content; for a named click use activate_visual_target directly."
+        "Observe, describe, or read visible non-web Windows screen content, text, and messages. "
+        "This never clicks; activate_visual_target clicks a visible target."
     )
     arguments_type = InspectScreenArguments
     result_type = ScreenInspectionResult
@@ -276,7 +277,8 @@ class InspectScreenTool(Tool[InspectScreenArguments, ScreenInspectionResult]):
 class ActivateVisualTargetTool(Tool[ActivateVisualTargetArguments, VisualActionResult]):
     name = "activate_visual_target"
     description = (
-        "Click a named visible desktop target directly with vision-first targeting."
+        "Click a named visible non-web Windows button or target. Call this directly when the user "
+        "describes the target; do not inspect first."
     )
     arguments_type = ActivateVisualTargetArguments
     result_type = VisualActionResult
@@ -528,6 +530,11 @@ def _select_uia_element(elements: list[Any], candidate: str) -> Any | None:
 class PerceptionToolPack:
     options: dict[str, object]
     name: str = "perception"
+    description: str = (
+        "non-web visible screen text/messages/errors and named visible button/target clicks; "
+        "inspect_screen observes and activate_visual_target clicks."
+    )
+    activation_name: str = "screen_perception"
     capture: ScreenCapture | None = None
     vision: VisionClient | None = None
     pointer: PointerController | None = None

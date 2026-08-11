@@ -2,6 +2,25 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.9] - 2026-08-10
+
+### Added
+
+- Generate compact capability-specific activation tools from registered pack metadata while
+  keeping capability selection entirely LLM-driven and activation effective on the next provider
+  round only.
+- Add bounded end-to-end model acceptance trajectories with controlled tool results, explicit
+  outcome and safety rules, and efficiency scoring separate from first-decision quality.
+
+### Changed
+
+- Allow small compound requests to execute as sequential native tool calls without creating a
+  persistent task plan; complex dependency-aware work continues to use the persistent task engine.
+- Stop a returned direct-call sequence after failure or cancellation, preserve structured evidence
+  for each call, and hold later calls behind exact confirmation boundaries.
+- Clarify managed-browser versus ordinary personal Chrome semantics in the model-facing capability
+  surface without adding deterministic intent routing.
+
 ## [0.1.8] - 2026-08-10
 
 ### Fixed

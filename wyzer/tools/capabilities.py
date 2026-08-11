@@ -23,6 +23,7 @@ class ListToolCapabilitiesArguments(ToolArguments):
 
 class CapabilitySummary(BaseModel):
     name: str
+    description: str
     tool_count: int = Field(ge=1)
     active: bool
 
@@ -46,6 +47,10 @@ class ActivateToolCapabilityResult(BaseModel):
     instruction: str
 
 
+class CapabilityActivationArguments(ToolArguments):
+    pass
+
+
 class _CoordinatorTool(Tool[ArgumentsT, ResultT], Generic[ArgumentsT, ResultT]):
     risk_level = RiskLevel.LOW
     read_only = True
@@ -63,8 +68,9 @@ class ListToolCapabilitiesTool(
 ):
     name = LIST_CAPABILITIES_TOOL
     description = (
-        "Discover optional browser, clipboard, desktop UI, diagnostics, files, and screen-perception "
-        "packs when the exact action tool is absent; do not substitute a visible tool."
+        "When the needed action tool is absent, discover optional packs: managed web, local files, "
+        "clipboard, desktop typing, screen perception, and diagnostics. Do not substitute a "
+        "merely similar visible tool."
     )
     arguments_type = ListToolCapabilitiesArguments
     result_type = ListToolCapabilitiesResult
@@ -75,8 +81,31 @@ class ActivateToolCapabilityTool(
 ):
     name = ACTIVATE_CAPABILITY_TOOL
     description = (
-        "Activate one exact pack name returned by capability discovery for this action or task; "
-        "use its newly visible tools on the next round."
+        "Make one exact discovered pack's tools available on the next round. Activation does not "
+        "perform the user's action; continue by calling the needed new action tool."
     )
     arguments_type = ActivateToolCapabilityArguments
     result_type = ActivateToolCapabilityResult
+
+
+class CapabilityActivationTool(
+    _CoordinatorTool[CapabilityActivationArguments, ActivateToolCapabilityResult]
+):
+    """One metadata-generated, zero-argument capability activator."""
+
+    arguments_type = CapabilityActivationArguments
+    result_type = ActivateToolCapabilityResult
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        capability_name: str,
+        capability_description: str,
+    ) -> None:
+        self.name = name
+        self.capability_name = capability_name
+        self.description = (
+            f"Make {capability_description} tools visible on the next round. "
+            "Does not perform the user's action."
+        )

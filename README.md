@@ -43,16 +43,20 @@ python -m ruff format --check .
 python -m mypy
 ```
 
-Before a release, run the read-only model acceptance suite against the configured provider. It
-checks 27 representative first decisions against Wyzer's real native tool schemas without executing
-desktop actions:
+Before a release, run both read-only model acceptance modes against the configured provider. The
+first-decision suite measures preferred tool selection and short direct sequences. The end-to-end
+suite measures completed outcomes over bounded rounds with controlled tool results. Neither mode
+executes desktop actions:
 
 ```powershell
 python -m wyzer.model_acceptance --output dist\model-acceptance.json
+python -m wyzer.end_to_end_acceptance --output dist\model-end-to-end-acceptance.json
 ```
 
-The command exits unsuccessfully when fewer than 80% of cases pass. Use `--case CASE_ID` to repeat
-one case while tuning a model or prompt.
+Each command exits unsuccessfully when fewer than 80% of cases pass. Use `--case CASE_ID` to repeat
+one case. End-to-end correctness and efficiency are reported independently, so a safe preliminary
+observation can lower efficiency without being mislabeled as task failure. See
+`docs/MODEL_ACCEPTANCE.md` for the scoring contract.
 
 Configure a tool-capable local model in `wyzer.toml`, start Ollama, and run:
 

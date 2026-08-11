@@ -38,4 +38,5 @@ def create_default_registry(
         registry.register_pack(pack_factory(), default_visible=False)
     for pack in load_enabled_tool_packs(tuple(enabled_entrypoint_packs)):
         registry.register_pack(pack, default_visible=False)
+    registry.finalize_capability_activation_surface()
     return registry
