@@ -1,11 +1,14 @@
 # LLM-driven task engine
 
-Wyzer uses the task engine only when a request needs two or more distinct computer actions.
-Conversation, questions, and single routine actions keep the direct native-tool path.
+Wyzer uses the task engine for longer complex work with meaningful dependencies, intermediate
+outcomes or artifacts, retries, recovery, or cross-step verification. Small immediately executable
+sequences can use several ordinary native calls in returned order without persistent task state.
+Needing more than one tool call does not by itself require a plan.
 
 The primary chat model silently authors outcome-focused steps with success criteria. It uses the
 same conversation to act, inspect results, revise an approach, and summarize the outcome. There is
 no keyword intent router, command tree, separate planner model, or scripted workflow language.
+The same model decides whether direct calls or persistent planning fit the work.
 
 ## State and evidence
 
@@ -23,6 +26,10 @@ Steps move through `pending`, `in_progress`, `needs_verification`, `verified`, `
 Capability rounds and task-coordination rounds have separate hard bounds. LLM-authored plan
 creation, revision, and step transitions therefore cannot consume the action-attempt budget, while
 a model that repeats invalid state operations is still stopped safely.
+
+Capability discovery and activation use the coordination bound rather than the computer-action
+budget. Activated pack names are stored with an active plan and restored on explicit resume. They
+are visibility state only and never satisfy a step's evidence gate.
 
 State is saved atomically at the configured `task_engine.state_path`. Startup changes an
 interrupted active plan to paused. A user can inspect or control long work with `task status`,

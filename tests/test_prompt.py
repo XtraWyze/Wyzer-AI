@@ -11,8 +11,8 @@ from wyzer.models import (
 
 def test_system_prompt_is_concise_and_describes_native_tool_behavior() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
-    assert "Use an available tool" in prompt
-    assert "Never claim an action succeeded" in prompt
+    assert "Use native tools for real computer actions" in prompt
+    assert "Never claim success before a tool result" in prompt
     assert "Do not expose tool names" in prompt
     assert "do not be dramatic" in prompt
     assert "ExecutionPlan" not in prompt
@@ -22,10 +22,10 @@ def test_system_prompt_is_concise_and_describes_native_tool_behavior() -> None:
 def test_system_prompt_distinguishes_managed_and_personal_chrome() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 
-    assert "personal Chrome" in prompt
-    assert "use control_named_window" in prompt
-    assert "ask which one" in prompt
-    assert "Never infer the intended Chrome scope" in prompt
+    assert "Personal Chrome" in prompt
+    assert "uses control_named_window" in prompt
+    assert "ask whether managed or personal" in prompt
+    assert "use no tool" in prompt
 
 
 def test_system_prompt_avoids_generic_follow_up_offers() -> None:
@@ -69,17 +69,47 @@ def test_system_prompt_requires_live_rechecks_without_dumping_broad_window_state
     prompt = SystemPromptBuilder().build(world, ConversationState())
 
     assert '"observed_open_windows"' not in prompt
-    assert "A minimized window is still open" in prompt
-    assert "never substitute is_process_running" in prompt
-    assert "perform the action directly" in prompt
-    assert "do not add a preliminary status check" in prompt
+    assert "Use list_open_windows only to check window status" in prompt
+    assert "Use control tools directly when target and destination are supplied" in prompt
+    assert "without preliminary observations" in prompt
 
 
-def test_system_prompt_requires_planning_before_multiple_capabilities() -> None:
+def test_system_prompt_distinguishes_direct_sequences_from_persistent_plans() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 
-    assert "first response must contain only task_plan_create" in prompt
-    assert "Never batch capability calls before that plan exists" in prompt
+    assert "one or several direct native tools" in prompt
+    assert "multiple calls alone do not require a plan" in prompt
+    assert "complex work with dependencies" in prompt
+    assert "task_plan_create as the only first call" in prompt
+    assert "Never mix plan creation with action or capability calls" in prompt
+
+
+def test_system_prompt_explains_capability_activation_is_not_the_action() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "activate_*_tools function" in prompt
+    assert "does not perform or prove" in prompt
+    assert "newly visible action tool" in prompt
+    assert "continue the original request" in prompt
+
+
+def test_system_prompt_distinguishes_observation_from_direct_actions() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "inspect_screen reads or describes" in prompt
+    assert "activate_visual_target clicks" in prompt
+    assert "status uses get_current_media" in prompt
+    assert "playback changes use control_media" in prompt
+    assert "control tools directly when target and destination are supplied" in prompt
+
+
+def test_system_prompt_distinguishes_clipboard_and_browser_semantics() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "read_clipboard reads existing text" in prompt
+    assert "copy_selected_text copies the selection" in prompt
+    assert "Managed-browser tools control Wyzer's dedicated session" in prompt
+    assert "Personal Chrome windows use Windows window tools" in prompt
 
 
 def test_system_prompt_replaces_raw_monitor_id_with_friendly_label() -> None:
@@ -123,4 +153,4 @@ def test_system_prompt_includes_scene_freshness_without_control_references() -> 
 
     assert '"desktop_scene"' in prompt
     assert '"name":"browser_page"' in prompt
-    assert "fresh read-only observation" in prompt
+    assert "freshly observe stale state" in prompt

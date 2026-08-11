@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
@@ -45,7 +46,14 @@ class TaskStateStore:
         with self._lock:
             return self._plan.model_copy(deep=True) if self._plan is not None else None
 
-    def create(self, action_id: UUID, goal: str, steps: list[dict[str, str]]) -> TaskPlan:
+    def create(
+        self,
+        action_id: UUID,
+        goal: str,
+        steps: list[dict[str, str]],
+        *,
+        active_capabilities: Iterable[str] = (),
+    ) -> TaskPlan:
         if not 1 <= len(steps) <= self.maximum_steps:
             raise TaskStateError(f"a plan requires 1 to {self.maximum_steps} steps")
         typed = [
@@ -62,7 +70,12 @@ class TaskStateStore:
                 raise TaskStateError(
                     "this action already has a plan; update it or revise its unfinished steps"
                 )
-            self._plan = TaskPlan(action_id=action_id, goal=goal.strip(), steps=typed)
+            self._plan = TaskPlan(
+                action_id=action_id,
+                goal=goal.strip(),
+                steps=typed,
+                active_capabilities=sorted(set(active_capabilities)),
+            )
             self._save()
             return self._plan.model_copy(deep=True)
 
@@ -225,6 +238,24 @@ class TaskStateStore:
 
     def cancel(self) -> TaskPlan:
         return self._set_plan_status(TaskPlanStatus.CANCELLED)
+
+    def activate_capability(self, name: str) -> TaskPlan:
+        """Retain one registry-validated capability on the active plan."""
+        with self._lock:
+            plan = self._require_plan()
+            if plan.status != TaskPlanStatus.ACTIVE:
+                raise TaskStateError(
+                    f"the plan is {plan.status.value}; capabilities cannot be activated"
+                )
+            capabilities = sorted({*plan.active_capabilities, name})
+            self._plan = plan.model_copy(
+                update={
+                    "active_capabilities": capabilities,
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+            self._save()
+            return self._plan.model_copy(deep=True)
 
     def summary(self) -> str:
         plan = self.snapshot()

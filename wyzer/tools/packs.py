@@ -30,6 +30,12 @@ class ToolPack(Protocol):
     @property
     def name(self) -> str: ...
 
+    @property
+    def description(self) -> str: ...
+
+    @property
+    def activation_name(self) -> str: ...
+
     def create_tools(self) -> Iterable[Tool[Any, Any]]:
         """Create fresh tool instances for one registry/worker."""
 
@@ -43,6 +49,8 @@ class SimpleToolPack:
 
     name: str
     tool_factories: tuple[ToolFactory, ...]
+    description: str = ""
+    activation_name: str = ""
 
     def create_tools(self) -> tuple[Tool[Any, Any], ...]:
         return tuple(factory() for factory in self.tool_factories)

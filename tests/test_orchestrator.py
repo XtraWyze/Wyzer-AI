@@ -5,6 +5,7 @@ from uuid import uuid4
 from pytest import CaptureFixture, MonkeyPatch
 
 from tests.fakes import (
+    ConsequentialEchoTool,
     EchoTool,
     FailingTool,
     OpenApplicationTool,
@@ -18,7 +19,11 @@ from wyzer.app.cli import chat
 from wyzer.brain import FakeChatProvider
 from wyzer.models import ChatMessage, ProviderChatResponse
 from wyzer.tasks import TaskPlanStatus, TaskStateStore
-from wyzer.tools import ToolRegistry
+from wyzer.tools import SimpleToolPack, ToolRegistry
+from wyzer.tools.capabilities import (
+    ActivateToolCapabilityTool,
+    ListToolCapabilitiesTool,
+)
 from wyzer.workers import InProcessExecutor
 
 
@@ -109,16 +114,164 @@ def test_simple_action_executes_without_confirmation_and_returns_tool_message() 
     assert assistant.world.snapshot().pending_confirmation is None
 
 
+def test_specialized_capability_is_activated_by_model_for_next_native_round() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        )
+    )
+    registry.register_pack(
+        SimpleToolPack(
+            "special",
+            (EchoTool,),
+            "specialized echo operations.",
+            "special",
+        ),
+        default_visible=False,
+    )
+    registry.finalize_capability_activation_surface()
+    provider = FakeChatProvider(
+        [
+            tool_response(("activate_special_tools", {})),
+            tool_response(("echo", {"message": "now visible"})),
+            text_response("Done."),
+            text_response("Hello."),
+        ]
+    )
+    assistant = build_assistant(registry, provider)
+
+    response = asyncio.run(assistant.handle("Use the specialized capability"))
+
+    assert response.text == "Done."
+    assert "echo" not in {tool.function.name for tool in provider.requests[0][1]}
+    assert "echo" in {tool.function.name for tool in provider.requests[1][1]}
+    assert assistant.world.snapshot().recent_tool_calls[-1].data == {"echoed": "now visible"}
+
+    asyncio.run(assistant.handle("Hello after that"))
+    assert "echo" not in {tool.function.name for tool in provider.requests[3][1]}
+
+
+def test_activation_cannot_expose_a_later_call_in_the_same_response() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        )
+    )
+    registry.register_pack(
+        SimpleToolPack("special", (EchoTool,), "special echo operations.", "special"),
+        default_visible=False,
+    )
+    registry.finalize_capability_activation_surface()
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                ("activate_special_tools", {}),
+                ("echo", {"message": "too early"}),
+            ),
+            tool_response(("echo", {"message": "next round"})),
+            text_response("Done."),
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=TaskStateStore())
+
+    response = asyncio.run(assistant.handle("Use the special tool"))
+
+    assert response.text == "Done."
+    results = assistant.world.snapshot().recent_tool_calls
+    assert [result.tool for result in results] == [
+        "activate_special_tools",
+        "echo",
+        "echo",
+    ]
+    assert results[1].error is not None
+    assert results[1].error.code == "CAPABILITY_NOT_ACTIVE"
+    assert results[2].data == {"echoed": "next round"}
+
+
+def test_registered_but_inactive_tool_cannot_bypass_capability_view() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        )
+    )
+    registry.register_pack(SimpleToolPack("special", (EchoTool,)), default_visible=False)
+    provider = FakeChatProvider(
+        [
+            tool_response(("echo", {"message": "not active"})),
+            text_response("I need to activate that capability first."),
+        ]
+    )
+    assistant = build_assistant(registry, provider)
+
+    response = asyncio.run(assistant.handle("Try the unavailable tool"))
+
+    assert "activate" in response.text
+    result = assistant.world.snapshot().recent_tool_calls[-1]
+    assert result.error is not None
+    assert result.error.code == "CAPABILITY_NOT_ACTIVE"
+
+
+def test_activation_does_not_bypass_confirmation_policy() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        )
+    )
+    registry.register_pack(
+        SimpleToolPack(
+            "messaging",
+            (ConsequentialEchoTool,),
+            "consequential messaging operations.",
+            "messaging",
+        ),
+        default_visible=False,
+    )
+    registry.finalize_capability_activation_surface()
+    provider = FakeChatProvider(
+        [
+            tool_response(("activate_messaging_tools", {})),
+            tool_response(("send_message", {"message": "hello"})),
+            text_response("Message sent."),
+        ]
+    )
+    assistant = build_assistant(registry, provider)
+
+    confirmation = asyncio.run(assistant.handle("Send the message"))
+
+    assert "should i continue" in confirmation.text.casefold()
+    assert not any(
+        result.tool == "send_message" and result.ok
+        for result in assistant.world.snapshot().recent_tool_calls
+    )
+
+    response = asyncio.run(assistant.handle("yes"))
+
+    assert response.text == "Message sent."
+    assert any(
+        result.tool == "send_message" and result.ok
+        for result in assistant.world.snapshot().recent_tool_calls
+    )
+
+
 def test_multiple_tool_calls_execute_in_returned_order() -> None:
     registry = ToolRegistry()
     registry.register(EchoTool())
+    tasks = TaskStateStore()
     provider = FakeChatProvider(
         [
             tool_response(("echo", {"message": "first"}), ("echo", {"message": "second"})),
             text_response("Both are done."),
         ]
     )
-    assistant = build_assistant(registry, provider)
+    assistant = build_assistant(registry, provider, tasks=tasks)
 
     response = asyncio.run(assistant.handle("Echo both"))
 
@@ -133,6 +286,8 @@ def test_multiple_tool_calls_execute_in_returned_order() -> None:
         "tool",
         "tool",
     ]
+    assert len({result.step_id for result in results}) == 2
+    assert tasks.snapshot() is None
 
 
 def test_unknown_tool_is_structured_error_and_never_executes() -> None:
@@ -240,9 +395,7 @@ def test_task_coordination_rounds_have_a_separate_hard_limit() -> None:
         },
     )
     provider = FakeChatProvider([tool_response(create_call) for _ in range(5)])
-    assistant = build_assistant(
-        ToolRegistry(), provider, maximum_tool_rounds=1, tasks=tasks
-    )
+    assistant = build_assistant(ToolRegistry(), provider, maximum_tool_rounds=1, tasks=tasks)
 
     response = asyncio.run(assistant.handle("Coordinate forever"))
 
@@ -332,7 +485,11 @@ def test_llm_can_silently_plan_and_verify_multistep_work() -> None:
         "echo",
     ]
     exposed = {tool.function.name for tool in provider.requests[0][1]}
-    assert {"task_plan_create", "task_step_update", "task_plan_revise"} <= exposed
+    assert "task_plan_create" in exposed
+    assert {"task_step_update", "task_plan_revise"}.isdisjoint(exposed)
+    active_plan_tools = {tool.function.name for tool in provider.requests[1][1]}
+    assert {"task_step_update", "task_plan_revise"} <= active_plan_tools
+    assert "task_plan_create" not in active_plan_tools
 
 
 def test_unfinished_plan_prevents_unsupported_completion_claim() -> None:
@@ -372,52 +529,121 @@ def test_unfinished_plan_prevents_unsupported_completion_claim() -> None:
     assert plan is not None and plan.status == TaskPlanStatus.BLOCKED
 
 
-def test_multiple_capability_calls_require_llm_authored_plan() -> None:
+def test_failed_direct_call_stops_later_mutation_and_returns_each_result() -> None:
     registry = ToolRegistry()
-    registry.register(EchoTool())
+    registry.register_many((FailingTool(), VerifiedActionTool()))
     tasks = TaskStateStore()
     provider = FakeChatProvider(
         [
             tool_response(
-                ("echo", {"message": "first"}),
-                ("echo", {"message": "second"}),
+                ("failing", {"message": "first"}),
+                ("verified_action", {"message": "must-not-run"}),
             ),
-            tool_response(
-                (
-                    "task_plan_create",
-                    {
-                        "goal": "Echo twice",
-                        "steps": [
-                            {"description": "First echo", "success_criteria": "First observed"},
-                            {
-                                "description": "Second echo",
-                                "success_criteria": "Second observed",
-                            },
-                        ],
-                    },
-                )
-            ),
-            tool_response(
-                ("echo", {"message": "first"}),
-                ("task_step_update", {"step_number": 1, "status": "verified"}),
-            ),
-            tool_response(
-                ("echo", {"message": "second"}),
-                ("task_step_update", {"step_number": 2, "status": "verified"}),
-            ),
-            text_response("Done."),
+            text_response("The first action failed, so I did not continue."),
         ]
     )
     assistant = build_assistant(registry, provider, tasks=tasks)
 
-    response = asyncio.run(assistant.handle("Echo two values"))
+    response = asyncio.run(assistant.handle("Try the first action, then change the second"))
 
-    assert response.text == "Done."
+    assert "did not continue" in response.text
     results = assistant.world.snapshot().recent_tool_calls
-    assert results[0].error is not None
-    assert results[0].error.code == "TASK_PLAN_REQUIRED"
-    assert not any(result.data == {"echoed": "first"} for result in results[:2])
-    assert tasks.snapshot().status == TaskPlanStatus.COMPLETED  # type: ignore[union-attr]
+    assert [result.tool for result in results] == ["failing", "verified_action"]
+    assert results[0].ok is False
+    assert results[1].error is not None
+    assert results[1].error.code == "SEQUENCE_STOPPED_AFTER_FAILURE"
+    assert results[1].error.details["failed_tool"] == "failing"
+    assert all(result.data != {"message": "must-not-run"} for result in results)
+    assert tasks.snapshot() is None
+
+
+def test_direct_multi_call_evidence_stays_bound_to_each_provider_call() -> None:
+    registry = ToolRegistry()
+    registry.register(VerifiedActionTool())
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                ("verified_action", {"message": "first"}),
+                ("verified_action", {"message": "second"}),
+            ),
+            text_response("Both changes are verified."),
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=TaskStateStore())
+
+    response = asyncio.run(assistant.handle("Make both small changes"))
+
+    assert response.text == "Both changes are verified."
+    results = assistant.world.snapshot().recent_tool_calls
+    assert [result.data["message"] for result in results if result.data is not None] == [
+        "first",
+        "second",
+    ]
+    assert len({result.step_id for result in results}) == 2
+    assert all(result.evidence["verification_status"] == "verified" for result in results)
+    tool_messages = provider.requests[1][0][-2:]
+    assert [message.tool_call_id for message in tool_messages] == ["call_0", "call_1"]
+
+
+def test_confirmation_pauses_direct_sequence_before_call_and_tail() -> None:
+    registry = ToolRegistry()
+    registry.register_many((EchoTool(), ConsequentialEchoTool(), VerifiedActionTool()))
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                ("echo", {"message": "draft"}),
+                ("send_message", {"message": "exact payload"}),
+                ("verified_action", {"message": "after send"}),
+            ),
+            text_response("The sequence is complete."),
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=TaskStateStore())
+
+    async def scenario() -> tuple[str, str]:
+        requested = await assistant.handle("Draft, send, then continue")
+        results = assistant.world.snapshot().recent_tool_calls
+        assert [result.tool for result in results] == ["echo"]
+        pending = assistant.world.snapshot().pending_confirmation
+        assert pending is not None
+        assert pending.tool_name == "send_message"
+        assert pending.arguments == {"message": "exact payload"}
+        completed = await assistant.handle("yes")
+        return requested.text, completed.text
+
+    requested, completed = asyncio.run(scenario())
+
+    assert "should i continue" in requested.casefold()
+    assert completed == "The sequence is complete."
+    results = assistant.world.snapshot().recent_tool_calls
+    assert [result.tool for result in results] == ["echo", "send_message", "verified_action"]
+    assert results[-1].data == {"message": "after send", "changed": True}
+    assert results[-1].evidence == {
+        "verification_status": "verified",
+        "predicate": "requested_action_observed",
+    }
+
+
+def test_declined_confirmation_discards_later_direct_calls() -> None:
+    registry = ToolRegistry()
+    registry.register_many((ConsequentialEchoTool(), VerifiedActionTool()))
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                ("send_message", {"message": "hello"}),
+                ("verified_action", {"message": "must-not-run"}),
+            )
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=TaskStateStore())
+
+    async def scenario() -> str:
+        await assistant.handle("Send and continue")
+        return (await assistant.handle("no")).text
+
+    assert asyncio.run(scenario()) == "Okay, I cancelled it."
+    assert assistant.world.snapshot().recent_tool_calls == []
+    assert len(provider.requests) == 1
 
 
 def test_capability_calls_after_plan_completion_never_execute() -> None:

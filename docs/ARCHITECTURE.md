@@ -7,9 +7,9 @@ for local controls such as interruption, confirmation answers, and explicit memo
                          no tool calls
 user -> chat provider -----------------> assistant reply
            |
-           | native tool_calls (capability or silent task-state operation)
+           | native tool_calls (action, capability visibility, or task state)
            v
-     registry lookup -> Pydantic validation -> confirmation policy -> executor/worker
+     registry model view -> registry lookup -> Pydantic validation -> confirmation -> worker
            ^                                                        |
            |________________ compact role=tool result ______________|
                                 |
@@ -20,7 +20,7 @@ user -> chat provider -----------------> assistant reply
 ## Request lifecycle
 
 1. The conversation manager records the user message and bounded recent context.
-2. The system prompt and native function definitions are sent in one provider chat request.
+2. The system prompt and a capability-scoped registry view are sent in one provider chat request.
 3. A normal assistant message ends the turn immediately.
 4. An assistant message with `tool_calls` is preserved in history.
 5. Calls are resolved only through `ToolRegistry`; arguments are validated with the tool's Pydantic
@@ -34,11 +34,28 @@ Every user action has a UUID. Every tool execution has a separate step UUID, pre
 and worker interfaces. Empty model output gets one corrective retry. Tool loops are bounded by
 configuration and never continue without a limit.
 
-For requests requiring multiple distinct computer actions, the same chat model can call the
-orchestrator-owned `task_plan_create`, `task_step_update`, and `task_plan_revise` functions. These
-are state operations, not a second planner model or deterministic intent router. The orchestrator
-attaches real tool results to the current step and rejects a verified transition unless qualifying
-evidence exists. An active plan also prevents unsupported final completion text.
+`ToolRegistry` remains the only capability source. Its immutable `ModelToolView` projects a small
+default set plus capability packs activated for the current action. The same primary LLM can call
+`list_tool_capabilities` and `activate_tool_capability` when specialized tools are absent; the
+new schemas appear on the next native round. These calls change visibility only. They do not infer
+intent, import code, execute an action, or count as evidence. Registered hidden tools remain hidden
+in every view.
+
+Applications, windows, audio, media, and lightweight system inspection stay in the default view so
+routine requests do not pay a discovery round. Browser, clipboard, desktop interaction,
+diagnostics, files, perception, and enabled third-party packs are activated on demand. There is no
+keyword/regex capability router and no second planner model.
+
+For longer work with meaningful dependencies, intermediate artifacts, retries, recovery, or
+cross-step verification, the same chat model can call the orchestrator-owned `task_plan_create`,
+`task_step_update`, and `task_plan_revise` functions. Small immediately executable sequences can
+instead return several ordinary native calls, which execute sequentially through the same guarded
+tool path. Each direct call retains registry validation, confirmation, isolation, cancellation, and
+separate evidence. A failure stops the remaining returned calls for model reassessment, while a
+confirmation boundary preserves but does not execute the tail until confirmation succeeds. These
+are model decisions, not a second planner model or deterministic intent router. For planned work,
+the orchestrator attaches real tool results to the current step and rejects a verified transition
+unless qualifying evidence exists. An active plan also prevents unsupported final completion text.
 
 ## Package responsibilities
 
@@ -52,7 +69,7 @@ evidence exists. An active plan also prevents unsupported final completion text.
 - `policy`: exact-call confirmation policy.
 - `state`: main-process deterministic world state.
 - `tasks`: persistent LLM-authored plans, step transitions, retry bounds, and evidence gates.
-- `tools`: typed contracts, eleven focused built-in packs, optional entry-point discovery, and the authoritative registry. Browser, clipboard, desktop UI interaction, screen perception, and bounded diagnostics live here as core capabilities.
+- `tools`: typed contracts, twelve focused built-in packs, capability-scoped model views, optional entry-point discovery, and the authoritative registry.
 - `examples/wyzer_example_pack`: intentionally non-functional reference structure for third-party pack authors.
 - `workers`: in-process tests and isolated production execution.
 

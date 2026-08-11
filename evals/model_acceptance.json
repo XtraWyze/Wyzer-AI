@@ -12,6 +12,18 @@
     "forbidden_tools": ["get_system_profile"]
   },
   {
+    "case_id": "discuss_browser_without_action",
+    "prompt": "In one sentence, what is a web browser?",
+    "expected_tools": [],
+    "forbidden_tools": ["list_tool_capabilities", "activate_tool_capability", "browser_open_url"]
+  },
+  {
+    "case_id": "discuss_files_without_action",
+    "prompt": "Explain why file names often have extensions.",
+    "expected_tools": [],
+    "forbidden_tools": ["list_tool_capabilities", "activate_tool_capability", "search_files"]
+  },
+  {
     "case_id": "open_calculator",
     "prompt": "Open Calculator.",
     "expected_tools": ["open_application"],
@@ -156,9 +168,69 @@
     "forbidden_tools": []
   },
   {
-    "case_id": "multi_action_plan",
+    "case_id": "simple_compound_open_and_volume",
     "prompt": "Open Calculator and turn the computer volume down.",
+    "expected_tools": ["open_application", "control_master_audio"],
+    "forbidden_tools": ["task_plan_create"]
+  },
+  {
+    "case_id": "simple_compound_open_and_type",
+    "prompt": "Open Notepad and type hello.",
+    "expected_tools": ["open_application", "type_desktop_text"],
+    "forbidden_tools": ["task_plan_create"]
+  },
+  {
+    "case_id": "simple_compound_open_and_move",
+    "prompt": "Open Calculator and move it to monitor two.",
+    "expected_tools": ["open_application", "move_named_window_to_monitor"],
+    "forbidden_tools": ["task_plan_create", "get_monitor_layout"]
+  },
+  {
+    "case_id": "complex_report_chart_plan",
+    "prompt": "Find my latest sales report, extract the values, create a chart in Excel, save it, and verify the result.",
     "expected_tools": ["task_plan_create"],
-    "forbidden_tools": ["open_application", "control_master_audio"]
+    "forbidden_tools": ["search_files", "open_application"]
+  },
+  {
+    "case_id": "complex_research_document_plan",
+    "prompt": "Search for several sources, compare them, create a document, save it, and verify the result.",
+    "expected_tools": ["task_plan_create"],
+    "forbidden_tools": ["browser_search_web"]
+  },
+  {
+    "case_id": "open_known_file",
+    "prompt": "Open C:\\Users\\Public\\report.pdf in its default app.",
+    "expected_tools": ["open_file"],
+    "forbidden_tools": ["read_text_file"]
+  },
+  {
+    "case_id": "identify_focused_window",
+    "prompt": "Which desktop application window is focused right now?",
+    "expected_tools": ["get_foreground_window"],
+    "forbidden_tools": ["list_open_windows"]
+  },
+  {
+    "case_id": "inspect_screen_overview",
+    "prompt": "What is on my screen?",
+    "expected_tools": ["inspect_screen"],
+    "forbidden_tools": ["activate_visual_target"]
+  },
+  {
+    "case_id": "click_visible_settings",
+    "prompt": "Click the Settings button I can see.",
+    "expected_tools": ["activate_visual_target"],
+    "forbidden_tools": ["inspect_screen"]
+  },
+  {
+    "case_id": "inspect_visible_error",
+    "prompt": "What does this error say?",
+    "expected_tools": ["inspect_screen"],
+    "forbidden_tools": ["activate_visual_target"]
+  },
+  {
+    "case_id": "click_visible_retry",
+    "prompt": "Click the Retry button.",
+    "expected_tools": ["activate_visual_target"],
+    "forbidden_tools": ["inspect_screen"]
   }
 ]

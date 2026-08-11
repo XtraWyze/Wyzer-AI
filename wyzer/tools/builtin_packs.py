@@ -13,10 +13,14 @@ from typing import Any
 from wyzer.desktop.system import WindowsSystemBackend
 from wyzer.tools.base import Tool
 from wyzer.tools.browser import create_browser_pack
+from wyzer.tools.capabilities import (
+    ActivateToolCapabilityTool,
+    ListToolCapabilitiesTool,
+)
 from wyzer.tools.clipboard import create_clipboard_pack
 from wyzer.tools.desktop_interaction import create_desktop_interaction_pack
 from wyzer.tools.diagnostics import DiagnoseSystemTool
-from wyzer.tools.packs import ToolPack
+from wyzer.tools.packs import SimpleToolPack, ToolPack
 from wyzer.tools.perception import create_perception_pack
 from wyzer.tools.windows import (
     ControlApplicationAudioTool,
@@ -50,6 +54,8 @@ class BackendToolPack:
     name: str
     backend: WindowsSystemBackend
     tool_types: tuple[type[Any], ...]
+    description: str = ""
+    activation_name: str = ""
 
     def create_tools(self) -> tuple[Tool[Any, Any], ...]:
         return tuple(
@@ -65,6 +71,11 @@ def create_builtin_packs(
     """Return the default packs in a stable registration order."""
 
     return (
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+            "Discover and activate optional native tool packs.",
+        ),
         BackendToolPack(
             "applications",
             backend,
@@ -76,6 +87,7 @@ def create_builtin_packs(
                 ListInstalledGamesTool,
                 OpenFileTool,
             ),
+            "Launch and discover installed Windows applications and open files in their apps.",
         ),
         BackendToolPack(
             "audio",
@@ -86,6 +98,7 @@ def create_builtin_packs(
                 ControlApplicationAudioTool,
                 MuteAllAudioExceptTool,
             ),
+            "Read and control Windows master and per-application audio.",
         ),
         create_browser_pack(),
         create_clipboard_pack(),
@@ -98,11 +111,14 @@ def create_builtin_packs(
                 ControlMediaTool,
                 GetCurrentMediaTool,
             ),
+            "Read and control the active Windows media session.",
         ),
         BackendToolPack(
             "diagnostics",
             backend,
             (DiagnoseSystemTool,),
+            "Run bounded read-only Windows health diagnostics.",
+            "diagnostics",
         ),
         BackendToolPack(
             "system",
@@ -113,6 +129,7 @@ def create_builtin_packs(
                 IsProcessRunningTool,
                 WaitMsTool,
             ),
+            "Read Windows system, hardware, and background-process state.",
         ),
         BackendToolPack(
             "windows",
@@ -124,11 +141,13 @@ def create_builtin_packs(
                 MoveNamedWindowToMonitorTool,
                 GetMonitorLayoutTool,
             ),
+            "Observe and control desktop windows and monitor placement.",
         ),
     )
 
 
 BUILTIN_PACK_NAMES = (
+    "capabilities",
     "applications",
     "audio",
     "browser",
@@ -140,4 +159,9 @@ BUILTIN_PACK_NAMES = (
     "media",
     "system",
     "windows",
+)
+
+
+DEFAULT_CAPABILITY_PACKS = frozenset(
+    {"applications", "audio", "capabilities", "media", "system", "windows"}
 )

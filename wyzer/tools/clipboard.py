@@ -185,7 +185,9 @@ def _paste_clipboard(
 def _make_read_tool() -> CallableTool[NoArguments, ClipboardResult]:
     return CallableTool(
         name="read_clipboard",
-        description="Read the current plain-text clipboard contents.",
+        description=(
+            "Use only to report text already on the clipboard; does not copy the current selection."
+        ),
         arguments_type=NoArguments,
         result_type=ClipboardResult,
         handler=_read_clipboard,
@@ -212,7 +214,8 @@ def _make_copy_selected_tool() -> CallableTool[FocusedWindowArguments, CopySelec
     return CallableTool(
         name="copy_selected_text",
         description=(
-            "Copy highlighted text from the focused app; verifies the target window."
+            "Use to copy the current highlighted selection from the focused app into the clipboard; "
+            "does not read old clipboard contents."
         ),
         arguments_type=FocusedWindowArguments,
         result_type=CopySelectedTextResult,
@@ -226,7 +229,7 @@ def _make_paste_tool() -> CallableTool[FocusedWindowArguments, PasteClipboardRes
     return CallableTool(
         name="paste_clipboard",
         description=(
-            "Paste the clipboard at the cursor in the focused app; verifies the target window."
+            "Paste existing clipboard contents at the cursor in the focused app."
         ),
         arguments_type=FocusedWindowArguments,
         result_type=PasteClipboardResult,
@@ -239,6 +242,11 @@ def _make_paste_tool() -> CallableTool[FocusedWindowArguments, PasteClipboardRes
 def create_clipboard_pack() -> SimpleToolPack:
     return SimpleToolPack(
         name="clipboard",
+        description=(
+            "explicit clipboard or selected-text work: read existing text, copy a highlighted "
+            "selection, or paste."
+        ),
+        activation_name="clipboard",
         tool_factories=(
             _make_read_tool,
             _make_write_tool,

@@ -519,6 +519,8 @@ class PressDesktopKeyTool(_DesktopTool):
 @dataclass(frozen=True, slots=True)
 class DesktopInteractionPack:
     name: str = "desktop_interaction"
+    description: str = "Type text or press keys in the focused Windows application."
+    activation_name: str = "desktop_interaction"
     adapter: DesktopUIAdapter | None = None
 
     def create_tools(self) -> tuple[Tool[Any, Any], ...]:

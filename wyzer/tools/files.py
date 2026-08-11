@@ -681,6 +681,8 @@ class FileToolPack:
     """Built-in local file discovery capability pack."""
 
     name = "files"
+    description = "Search, read, list, create, move, copy, rename, or delete local paths."
+    activation_name = "file"
 
     def __init__(self, catalog: FileCatalog, backend: WindowsSystemBackend) -> None:
         self.catalog = catalog
