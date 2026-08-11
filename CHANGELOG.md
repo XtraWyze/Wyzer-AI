@@ -2,6 +2,24 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.1.10] - 2026-08-10
+
+### Fixed
+
+- Keep task-plan validation details in internal diagnostics instead of exposing schema errors or
+  asking users to supply planning fields for simple requests.
+- Guide installed-game count and listing requests to the existing direct inventory tool, including
+  count-only replies that omit game names.
+
+### Changed
+
+- Clarify that capability activation must be followed by the requested direct action and does not
+  make otherwise simple work require a persistent task plan.
+- Hide file-index maintenance from the model-facing file capability while preserving its internal
+  registration, and strengthen named-folder/project semantics without deterministic text routing.
+- Add first-decision and bounded end-to-end regression cases for game inventory and named-project
+  opening, retaining strict failure behavior when a requested project is not actually opened.
+
 ## [0.1.9] - 2026-08-10
 
 ### Added

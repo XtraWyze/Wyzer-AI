@@ -105,7 +105,13 @@ class CapabilityActivationTool(
     ) -> None:
         self.name = name
         self.capability_name = capability_name
-        self.description = (
-            f"Make {capability_description} tools visible on the next round. "
-            "Does not perform the user's action."
+        prefix = "Expose next-round tools for: "
+        suffix = (
+            " Does not perform the user's action; then call the needed direct tool. "
+            "Activation is no reason to plan."
         )
+        maximum_summary = 240 - len(prefix) - len(suffix)
+        summary = capability_description.strip()
+        if len(summary) > maximum_summary:
+            summary = summary[: maximum_summary - 1].rsplit(" ", 1)[0] + "…"
+        self.description = prefix + summary + suffix

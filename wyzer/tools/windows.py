@@ -840,7 +840,10 @@ class RefreshApplicationIndexTool(WindowsToolBase, Tool[NoArguments, Application
 
 class ListInstalledGamesTool(WindowsToolBase, Tool[NoArguments, InstalledGamesResult]):
     name = "list_installed_games"
-    description = "List installed games."
+    description = (
+        "Count or list installed games from Wyzer's game-library index. If the user asks how many "
+        "without names, use the returned count and do not list games."
+    )
     arguments_type = NoArguments
     result_type = InstalledGamesResult
     risk_level = RiskLevel.LOW

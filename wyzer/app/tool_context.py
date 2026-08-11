@@ -37,7 +37,14 @@ class ToolResultContextBuilder:
                 "code": result.error.code,
                 "message": result.error.message,
             }
-            if result.error.details:
+            if result.error.code == "INVALID_TASK_ARGUMENTS":
+                payload["error"]["recovery"] = (
+                    "Do not expose this schema error or ask the user for planning fields. Reassess "
+                    "the original request. Use a matching direct tool for one count, list, lookup, "
+                    "or open. Only retry task planning for genuinely complex work, and author every "
+                    "required goal, step description, and success criterion yourself."
+                )
+            elif result.error.details:
                 payload["error"]["details"] = self._clean(result.error.details)
         serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
         if len(serialized) <= self._maximum_characters:

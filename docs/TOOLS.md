@@ -137,7 +137,9 @@ The built-in `files` pack provides discovery plus direct file management:
 - `rename_path`
 - `delete_path` — sends the target to the Windows Recycle Bin and always requires confirmation
 - `open_indexed_folder`
-- `refresh_file_index`
+
+`refresh_file_index` remains registered as an internal maintenance tool but is hidden from the
+normal model-visible file capability, matching the hidden application-index refresh behavior.
 
 Copy, move, and rename never overwrite an existing destination implicitly. Destructive changes to
 drive roots and protected Windows/program directories are rejected. File management results are

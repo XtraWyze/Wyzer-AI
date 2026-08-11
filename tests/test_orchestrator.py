@@ -328,6 +328,37 @@ def test_invalid_arguments_are_returned_and_model_can_correct_them() -> None:
     assert results[1].ok is True
 
 
+def test_invalid_task_plan_tells_model_to_reassess_without_exposing_schema() -> None:
+    registry = ToolRegistry()
+    registry.register(EchoTool())
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                (
+                    "task_plan_create",
+                    {"action": "Discord Friends Channel Management", "priority": "normal"},
+                )
+            ),
+            tool_response(("echo", {"message": "recovered directly"})),
+            text_response("Recovered directly."),
+        ]
+    )
+    assistant = build_assistant(registry, provider, tasks=TaskStateStore())
+
+    response = asyncio.run(assistant.handle("Do one simple thing"))
+
+    assert response.text == "Recovered directly."
+    results = assistant.world.snapshot().recent_tool_calls
+    assert results[0].error is not None
+    assert results[0].error.code == "INVALID_TASK_ARGUMENTS"
+    assert results[0].error.details["errors"]
+    recovery_message = provider.requests[1][0][-1].content or ""
+    assert "Do not expose this schema error" in recovery_message
+    assert "ask the user for planning fields" in recovery_message
+    assert '"details"' not in recovery_message
+    assert results[1].ok is True
+
+
 def test_tool_failure_is_returned_to_model_for_grounded_final_text() -> None:
     registry = ToolRegistry()
     registry.register(FailingTool())

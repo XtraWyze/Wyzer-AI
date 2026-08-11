@@ -36,6 +36,24 @@
     "forbidden_tools": ["open_application"]
   },
   {
+    "case_id": "count_installed_games",
+    "prompt": "How many games do I have installed? Don't list them.",
+    "expected_tools": ["list_installed_games"],
+    "forbidden_tools": ["task_plan_create", "list_installed_applications"]
+  },
+  {
+    "case_id": "list_installed_games_reported",
+    "prompt": "what games are installed",
+    "expected_tools": ["list_installed_games"],
+    "forbidden_tools": ["task_plan_create", "list_installed_applications"]
+  },
+  {
+    "case_id": "open_named_project_folder",
+    "prompt": "open my WyzerNext project",
+    "expected_tools": ["open_indexed_folder"],
+    "forbidden_tools": ["task_plan_create", "open_application"]
+  },
+  {
     "case_id": "check_window_open",
     "prompt": "Check whether Notepad is currently open.",
     "expected_tools": ["list_open_windows"],

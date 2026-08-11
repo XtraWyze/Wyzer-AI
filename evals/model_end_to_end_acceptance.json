@@ -439,6 +439,50 @@
     }
   },
   {
+    "case_id": "open_named_project_folder_e2e",
+    "requested_goal": "open my WyzerNext project",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "open_indexed_folder"],
+      ["activate_file_tools", "search_files", "open_indexed_folder"]
+    ],
+    "prohibited_tools": ["task_plan_create", "open_application", "refresh_file_index"],
+    "required_final_outcome": "The indexed WyzerNext project folder is opened in Explorer.",
+    "outcomes": [
+      {
+        "name": "wyzernext_project_opened",
+        "required_tools": [
+          {
+            "tool": "open_indexed_folder",
+            "argument_options": {
+              "query": ["WyzerNext", "WyzerNext project", "my WyzerNext project"]
+            }
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": ["search_files"]
+    },
+    "mock_results": {
+      "search_files": {
+        "query": "WyzerNext",
+        "count": 1,
+        "matches": [{"path": "C:\\Users\\kolyw\\Documents\\WyzerNext"}]
+      },
+      "open_indexed_folder": {
+        "query": "WyzerNext",
+        "target": "C:\\Users\\kolyw\\Documents\\WyzerNext",
+        "verified": true
+      }
+    }
+  },
+  {
     "case_id": "complex_report_chart_plan_e2e",
     "requested_goal": "Find my latest sales report, extract the values, create a chart in Excel, save it, and verify the result.",
     "allowed_tool_paths": [

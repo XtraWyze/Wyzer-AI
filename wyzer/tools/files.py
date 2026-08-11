@@ -82,7 +82,14 @@ class DeletePathArguments(ToolArguments):
 
 
 class OpenIndexedFolderArguments(ToolArguments):
-    query: str = Field(min_length=1, max_length=500)
+    query: str = Field(
+        min_length=1,
+        max_length=500,
+        description=(
+            "Literal proper name identifying the user's requested folder or project. Copy it "
+            "exactly from the request; exclude possessives, determiners, and the type word."
+        ),
+    )
     destination: MonitorDestination | None = None
 
     @model_validator(mode="before")
@@ -521,7 +528,8 @@ class OpenIndexedFolderTool(
 ):
     name = "open_indexed_folder"
     description = (
-        "Find and open an indexed folder, optionally on a specified monitor."
+        "Find and open an indexed folder/project. Copy the requested name exactly into query; "
+        "optionally place its window on a specified monitor."
     )
     arguments_type = OpenIndexedFolderArguments
     result_type = IndexedFolderOpenResult
@@ -551,7 +559,9 @@ class OpenIndexedFolderTool(
             }
             for match in matches
         ]
-        target = Path(dominant_location([match.path for match in matches], arguments.query))
+        target = Path(
+            dominant_location([match.path for match in matches], arguments.query)
+        )
         before_handles = {window.handle for window in self.backend.list_windows()}
         self.backend.open_file(target)
         matched_window: WindowInfo | None = None
@@ -655,6 +665,7 @@ class ReadTextFileTool(FileToolBase, Tool[ReadTextFileArguments, TextFileResult]
 
 
 class RefreshFileIndexTool(FileToolBase, Tool[RefreshFileIndexArguments, FileIndexResult]):
+    llm_visible = False
     name = "refresh_file_index"
     description = "Refresh the local index of safe file metadata and text."
     arguments_type = RefreshFileIndexArguments
@@ -681,7 +692,10 @@ class FileToolPack:
     """Built-in local file discovery capability pack."""
 
     name = "files"
-    description = "Search, read, list, create, move, copy, rename, or delete local paths."
+    description = (
+        "Search, read, list, or open named local folders/projects; create, move, copy, rename, or "
+        "delete local paths."
+    )
     activation_name = "file"
 
     def __init__(self, catalog: FileCatalog, backend: WindowsSystemBackend) -> None:
