@@ -787,7 +787,9 @@ class Orchestrator:
                     ),
                     "instruction": (
                         "Activation is complete but performed no action. Continue the original request "
-                        "now with the matching newly available action or observation tool."
+                        "now with the matching newly available action or observation tool. Activation "
+                        "does not make a small request complex; do not create a plan merely because "
+                        "activation was needed."
                     ),
                 }
         except UnknownCapabilityError as error:

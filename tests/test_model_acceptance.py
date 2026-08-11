@@ -34,6 +34,9 @@ def test_model_acceptance_cases_are_valid_and_cover_key_routes() -> None:
         "simple_compound_open_and_move",
         "complex_report_chart_plan",
         "complex_research_document_plan",
+        "count_installed_games",
+        "list_installed_games_reported",
+        "open_named_project_folder",
     } <= identifiers
 
 

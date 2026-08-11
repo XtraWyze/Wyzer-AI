@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from wyzer.app.tool_context import ToolResultContextBuilder
-from wyzer.models import ToolResult
+from wyzer.models import StructuredError, ToolResult
 
 
 def test_large_binary_and_internal_payloads_are_excluded_from_model_context() -> None:
@@ -94,3 +94,30 @@ def test_model_context_omits_raw_monitor_ids_but_keeps_topology_labels() -> None
     assert "monitor:65659" not in context
     assert "monitor 2" in context
     assert '"response_target":"Notepad"' in context
+
+
+def test_invalid_task_context_preserves_internal_details_but_guides_model_recovery() -> None:
+    now = datetime.now(UTC)
+    result = ToolResult(
+        ok=False,
+        tool="task_plan_create",
+        action_id=uuid4(),
+        step_id=uuid4(),
+        started_at=now,
+        finished_at=now,
+        duration_ms=0,
+        error=StructuredError(
+            code="INVALID_TASK_ARGUMENTS",
+            message="Task arguments did not match the planning schema.",
+            retryable=True,
+            details={"errors": [{"type": "missing", "loc": ["goal"]}]},
+        ),
+    )
+
+    context = ToolResultContextBuilder().build(result)
+
+    assert result.error is not None and result.error.details["errors"]
+    assert "Do not expose this schema error" in context
+    assert "ask the user for planning fields" in context
+    assert '"details"' not in context
+    assert '"type":"missing"' not in context

@@ -373,7 +373,11 @@ async def evaluate_end_to_end(
                             activation_rounds.add(round_number)
                             payload = {
                                 "name": capability,
-                                "instruction": "Activation completed without performing the requested action.",
+                                "instruction": (
+                                    "Activation completed without performing the requested action. "
+                                    "Continue with the matching new direct tool; do not create a plan "
+                                    "merely because activation was needed."
+                                ),
                             }
                         successful_path.append(name)
                         if not _path_is_prefix(successful_path, case.allowed_tool_paths):

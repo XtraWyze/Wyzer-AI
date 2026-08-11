@@ -82,14 +82,25 @@ def test_system_prompt_distinguishes_direct_sequences_from_persistent_plans() ->
     assert "complex work with dependencies" in prompt
     assert "task_plan_create as the only first call" in prompt
     assert "Never mix plan creation with action or capability calls" in prompt
+    assert "never ask the user for schema fields" in prompt
+    assert "silently correct arguments" in prompt
+
+
+def test_system_prompt_routes_game_inventory_and_named_projects_semantically() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "Game counts/lists use list_installed_games" in prompt
+    assert "count-only requests omit names" in prompt
+    assert "activate_file_tools then open_indexed_folder" in prompt
+    assert "Copy user-supplied names verbatim" in prompt
 
 
 def test_system_prompt_explains_capability_activation_is_not_the_action() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 
     assert "activate_*_tools function" in prompt
-    assert "does not perform or prove" in prompt
-    assert "newly visible action tool" in prompt
+    assert "neither performs nor proves" in prompt
+    assert "new action tool next round" in prompt
     assert "continue the original request" in prompt
 
 

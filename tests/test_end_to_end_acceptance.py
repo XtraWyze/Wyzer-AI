@@ -50,6 +50,7 @@ def test_end_to_end_cases_are_valid_and_cover_required_categories() -> None:
         "read_known_file_e2e",
         "delete_known_file_e2e",
         "click_retry_e2e",
+        "open_named_project_folder_e2e",
         "complex_report_chart_plan_e2e",
         "complex_research_document_plan_e2e",
     } <= identifiers
@@ -191,3 +192,25 @@ def test_complex_plan_requires_meaningful_distinct_steps(
 
     assert report.results[0].passed is True
     assert report.results[0].satisfied_outcome == "dependency_aware_plan_created"
+
+
+def test_project_folder_opens_directly_after_file_activation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeChatProvider(
+        [
+            tool_response(("activate_file_tools", {})),
+            tool_response(("open_indexed_folder", {"query": "WyzerNext"})),
+        ]
+    )
+
+    report = _evaluate(monkeypatch, _case("open_named_project_folder_e2e"), provider)
+    result = report.results[0]
+
+    assert result.passed is True
+    assert result.successful_tool_path == [
+        "activate_file_tools",
+        "open_indexed_folder",
+    ]
+    assert result.unnecessary_observations == 0
+    assert result.efficiency_score == 1.0

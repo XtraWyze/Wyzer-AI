@@ -58,7 +58,6 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "press_desktop_key",
     "read_clipboard",
     "read_text_file",
-    "refresh_file_index",
     "rename_path",
     "search_files",
     "search_installed_applications",
@@ -68,7 +67,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "type_desktop_text",
     "write_clipboard",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "ee4245352768fd740baced57a31417da4b8b2819fa15696ae41996e85dd5437b"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "007c5435110980828a261359d8df531771a0018520fbb5a4bca0dfe148fe0292"
 
 
 def _semantic_schema(value: Any) -> Any:
@@ -154,6 +153,20 @@ def test_default_tool_descriptions_reject_near_match_fallbacks() -> None:
     all_tools = {tool.function.name: tool.function.description for tool in registry.all_native_tools()}
 
     assert "Never use to find a file" in tools["search_installed_applications"]
+    assert "If the user asks how many" in tools["list_installed_games"]
     assert "activate the files capability" in all_tools["open_file"]
+    assert "requested name exactly" in all_tools["open_indexed_folder"]
+    folder_tool = next(
+        tool
+        for tool in registry.model_view(("files",)).native_tools()
+        if tool.function.name == "open_indexed_folder"
+    )
+    folder_description = folder_tool.function.parameters["properties"]["query"][
+        "description"
+    ]
+    assert "Literal proper name" in folder_description
+    assert "Copy it exactly from the request" in folder_description
+    assert "exclude possessives" in folder_description
+    assert "open named local folders/projects" in tools["activate_file_tools"]
     assert "never use it to close a browser" in tools["control_media"]
     assert "no preliminary window check is needed" in tools["control_named_window"]
