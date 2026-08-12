@@ -2,6 +2,22 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.1] - 2026-08-12
+
+### Added
+
+- Add native `write_text_file`, `edit_text_file`, and `append_text_file` tools to the existing
+  dynamically activated file capability, with compact model-facing schemas and structured results.
+- Add exact-occurrence edits, optional SHA-256 preconditions, explicit file and parent creation,
+  Unicode coverage, and session-context tracking for successfully mutated files.
+
+### Security
+
+- Require explicit overwrite intent and existing conditional confirmation before replacing a text
+  file, while rejecting protected, sensitive, invalid, symbolic-link, and binary targets.
+- Stage replacements beside the target, recheck the original bytes for concurrent changes, and use
+  atomic replacement so failures do not partially modify existing files.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added

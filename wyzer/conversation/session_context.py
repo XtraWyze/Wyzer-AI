@@ -107,6 +107,9 @@ class SessionContextManager:
     _FILE_TOOLS: ClassVar[frozenset[str]] = frozenset({
         "search_files",
         "read_text_file",
+        "write_text_file",
+        "edit_text_file",
+        "append_text_file",
         "list_directory",
         "open_file",
         "open_indexed_folder",
@@ -350,6 +353,10 @@ class SessionContextManager:
             return
 
         if tool == "read_text_file":
+            self._record_file_path(data.get("path"), make_last=True)
+            return
+
+        if tool in {"write_text_file", "edit_text_file", "append_text_file"}:
             self._record_file_path(data.get("path"), make_last=True)
             return
 
