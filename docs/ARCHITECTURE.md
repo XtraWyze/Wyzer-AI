@@ -27,7 +27,9 @@ user -> chat provider -----------------> assistant reply
    model before execution. Calls run sequentially in returned order.
 6. Each deterministic result is compacted, recorded normally with full evidence, and appended as a
    named `role=tool` message.
-7. The same chat continues until the model returns final text, confirmation is required, the user
+7. Successful observed results also update the bounded in-memory session context before the next
+   model round. Failed or explicitly unverified actions do not advance entity state.
+8. The same chat continues until the model returns final text, confirmation is required, the user
    interrupts, a provider fails, or the configured round limit is reached.
 
 Every user action has a UUID. Every tool execution has a separate step UUID, preserving the event
@@ -61,7 +63,7 @@ unless qualifying evidence exists. An active plan also prevents unsupported fina
 
 - `app`: native tool loop, compact tool context, and text/voice interfaces.
 - `brain`: typed chat provider boundary, Ollama/OpenAI-compatible adapters, and system prompt.
-- `conversation`: bounded transcript, native message history, references, and recent entities.
+- `conversation`: bounded transcript, native message history, and session-only continuity facts.
 - `desktop`: Windows application index plus Win32 process, window, monitor, audio, and media backends.
 - `perception`: on-demand Windows screenshot capture and the local Ollama vision client.
 - `events`: bounded structured event ledger.
@@ -75,6 +77,33 @@ unless qualifying evidence exists. An active plan also prevents unsupported fina
 
 The model never mutates Windows directly. It can only request registered functions. Tool evidence,
 not model prose, establishes what occurred.
+
+## Session context and task continuity
+
+`SessionContextManager` is a small process-local fact tracker. Every completed tool call reaches it
+through the orchestrator's existing post-result seam, after world-state observation has been applied.
+It tracks the active and previous window/application, current folder/project, last and recent files,
+managed-browser page/tab, last and previous user-facing monitor, compact last-call/result metadata,
+and bounded recent action/entity histories. Window handles, paths, URLs, tab indexes, and monitor
+metadata come from typed tool results; the tracker does not manufacture identifiers.
+
+Before each provider call, the orchestrator adds a compact `session_context` object to the existing
+`CONTEXT_JSON`. Ordinary model-message history remains intact, while the older broad recent-app,
+window, file, and website lists are omitted from production prompt assembly to avoid duplicating the
+same grounding. Raw file contents, browser DOMs, UI trees, screenshots, and full tool payloads never
+enter the session snapshot. Histories default to eight items and the model-facing representation has
+an independent 2,400-character ceiling.
+
+Reference resolution remains LLM-driven. Python never scans user text for pronouns or rewrites a
+window target. The prompt tells the model to interpret ordered session facts and author a concrete
+tool argument; ambiguity is handled by asking the user. The normal registry, validation,
+confirmation, sequential multi-call, failure-stop, and evidence paths are unchanged. Context updates
+after every completed call in a returned sequence, so the next model round sees the newest observed
+state.
+
+Developers can inspect `orchestrator.session_context.snapshot()` or the one-line
+`orchestrator.session_context.debug_summary()`. Each update also emits a debug-level
+`[session-context]` log entry; normal user output is unaffected.
 
 ## Shared desktop scene
 

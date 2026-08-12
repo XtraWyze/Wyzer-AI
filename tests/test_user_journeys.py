@@ -31,16 +31,23 @@ def test_imperfect_spoken_application_name_is_handled_by_model_and_index() -> No
 
 
 def test_recent_application_context_is_available_for_pronoun_followup() -> None:
-    provider = FakeChatProvider([text_response("I moved it.")])
+    provider = FakeChatProvider(
+        [
+            tool_response(("open_application", {"application": "Google Chrome"})),
+            text_response("Chrome is open."),
+            text_response("I can resolve that from the session context."),
+        ]
+    )
     registry = create_default_registry(FakeWindowsBackend())
     assistant = Orchestrator(registry, InProcessExecutor(registry), provider)
-    assistant.conversation.mention_application("Google Chrome")
 
+    asyncio.run(assistant.handle("Open Google Chrome"))
     asyncio.run(assistant.handle("Put it on the other screen"))
 
-    system = provider.requests[0][0][0].content or ""
+    system = provider.requests[2][0][0].content or ""
+    assert '"session_context"' in system
     assert "Google Chrome" in system
-    assert "Put it on the other screen" in (provider.requests[0][0][-1].content or "")
+    assert "Put it on the other screen" in (provider.requests[2][0][-1].content or "")
 
 
 def test_multi_tool_request_uses_one_initial_model_decision_and_ordered_results() -> None:

@@ -2,6 +2,29 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.0] - 2026-08-12
+
+### Added
+
+- Add bounded, session-only task continuity for recently observed windows, applications, files,
+  projects, folders, managed-browser pages and tabs, monitors, actions, and entities.
+- Add compact model-facing session snapshots derived from authoritative successful tool results,
+  plus debug summaries and debug-level context logging for developers.
+- Add continuity coverage for current and previous windows, monitor moves, file search/open flows,
+  browser tabs, failed and unverified actions, history bounds, and ordered multi-tool sequences.
+
+### Changed
+
+- Let the primary LLM resolve references such as “it,” “the previous window,” and “the first one”
+  semantically from structured session facts and conversation history, then author concrete tool
+  arguments through the existing guarded tool path.
+- Avoid duplicating broad recent application, window, file, and website lists in production model
+  context while retaining bounded native conversation and compact tool-result messages.
+
+### Removed
+
+- Remove deterministic generic-window argument rewriting and the unused regex reference resolver.
+
 ## [0.1.10] - 2026-08-10
 
 ### Fixed

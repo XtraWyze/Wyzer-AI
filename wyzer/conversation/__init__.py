@@ -1,6 +1,19 @@
-"""Bounded conversational context and reference resolution."""
+"""Bounded conversational and session context."""
 
 from wyzer.conversation.manager import ConversationManager
-from wyzer.conversation.references import ReferenceResolution, ReferenceResolver
+from wyzer.conversation.session_context import (
+    SessionAction,
+    SessionContext,
+    SessionContextManager,
+    SessionEntity,
+    SessionMonitor,
+)
 
-__all__ = ["ConversationManager", "ReferenceResolution", "ReferenceResolver"]
+__all__ = [
+    "ConversationManager",
+    "SessionAction",
+    "SessionContext",
+    "SessionContextManager",
+    "SessionEntity",
+    "SessionMonitor",
+]
