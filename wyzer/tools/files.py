@@ -1092,7 +1092,7 @@ class FileToolPack:
     name = "files"
     description = (
         "open named local folders/projects; search/read files; write/edit/append text; "
-        "list/manage paths."
+        "list paths; create/copy/move/rename/delete files and folders."
     )
     activation_name = "file"
 

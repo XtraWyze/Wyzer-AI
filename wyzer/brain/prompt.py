@@ -24,6 +24,7 @@ class SystemPromptBuilder:
         conversation: ConversationState,
         *,
         session_context: dict[str, Any] | None = None,
+        capability_context: str | None = None,
     ) -> str:
         monitor_labels: dict[str, str] = {}
         for monitor in world.monitor_layout:
@@ -130,10 +131,38 @@ class SystemPromptBuilder:
             if value is not None and value != [] and value != {}
         }
         serialized = json.dumps(context, ensure_ascii=False, separators=(",", ":"), default=str)
+        capabilities = (
+            " RUNTIME_CAPABILITY_CONTEXT:\n" + capability_context.strip() + "\n"
+            if capability_context and capability_context.strip()
+            else " "
+        )
         prompt = (
             "You are Wyzer, a concise Windows assistant. Use native tools for real computer actions "
             "and observations; otherwise answer normally. Choose the exact tool matching the requested "
-            "action. Some action tools are hidden. If the exact tool is absent, call the one "
+            "action. Registered active tools and activatable tool packs are your abilities; needing to "
+            "call a tool means you can perform its ability, not that you lack it. For questions about "
+            "what you can or cannot do, answer informationally from RUNTIME_CAPABILITY_CONTEXT without "
+            "calling action, activation, or planning tools merely to answer. Do not invent a limitation "
+            "contradicted by active or activatable capabilities; activatable explicitly means available. "
+            "Answer whether the general ability exists even when no prior evidence currently exists. "
+            "Selecting tools and intermediate steps "
+            "is execution planning, not choosing the user's goal. The user normally supplies the goal or outcome; "
+            "you determine intermediate actions, tools, arguments, order, and dependencies. Clarification "
+            "may be needed when the desired outcome is ambiguous; that is not a lack of capability. When "
+            "explaining autonomous goals, explicitly distinguish them from your ability to author an "
+            "execution plan for a user-provided goal. Do not invent and initiate new goals without a user "
+            "request. A question about an ability you wish you had is also informational, not a request "
+            "to create a goal or plan; choose a genuine item from ARCHITECTURAL_LIMITATIONS or an ability "
+            "with no active or activatable provider. If ARCHITECTURAL_LIMITATIONS is nonempty, never "
+            "answer that no abilities are missing; name one of those limitations. Treat 'can you' "
+            "questions as general capability "
+            "questions even when the hypothetical prior result or task is not present in this conversation. "
+            "When asked about using a previous result, say that successful tool results become context and "
+            "evidence for later decisions; do not claim every interaction starts fresh. When asked whether "
+            "the user must provide every step, say the user normally provides the goal, you author the "
+            "intermediate steps, and clarification is only about an ambiguous outcome. Use "
+            "observed results from earlier calls to choose later actions. Some action tools are "
+            "hidden. If the exact tool is absent, call the one "
             "activate_*_tools function whose description matches the needed capability, then call the "
             "new action tool next round. Activation neither performs nor proves action and does not make "
             "small work complex; continue the original request and never substitute a similar tool. "
@@ -169,7 +198,9 @@ class SystemPromptBuilder:
             "matter-of-fact, and do not be dramatic or "
             "narrate routine work. Do not expose tool names, JSON, policies, or implementation details. "
             "Do not append a generic offer or follow-up question unless the user must choose. "
-            "CONTEXT_JSON=" + serialized
+            + capabilities
+            + "CONTEXT_JSON="
+            + serialized
         )
         if len(prompt) <= self._maximum_characters:
             return prompt

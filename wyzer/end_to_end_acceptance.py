@@ -13,7 +13,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from wyzer.brain import SystemPromptBuilder, create_chat_provider
+from wyzer.brain import (
+    CapabilityContextBuilder,
+    OrchestratorFeatures,
+    SystemPromptBuilder,
+    create_chat_provider,
+)
 from wyzer.config import WyzerSettings
 from wyzer.models import ChatMessage, ConversationState, WorldStateSnapshot
 from wyzer.policy.confirmations import ConfirmationPolicy
@@ -300,7 +305,14 @@ async def evaluate_end_to_end(
 
     personality = settings.personality.model_dump(mode="json")
     system_prompt = SystemPromptBuilder(personality=personality).build(
-        WorldStateSnapshot(), ConversationState()
+        WorldStateSnapshot(),
+        ConversationState(),
+        capability_context=CapabilityContextBuilder(
+            registry,
+            OrchestratorFeatures(
+                persistent_complex_task_planning=settings.task_engine.enabled
+            ),
+        ).build(),
     )
     confirmation_policy = ConfirmationPolicy(settings.confirmation_ttl_seconds)
     results: list[EndToEndCaseResult] = []

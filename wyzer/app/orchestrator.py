@@ -15,7 +15,12 @@ from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from wyzer.app.tool_context import ToolResultContextBuilder
-from wyzer.brain import ChatProvider, SystemPromptBuilder
+from wyzer.brain import (
+    CapabilityContextBuilder,
+    ChatProvider,
+    OrchestratorFeatures,
+    SystemPromptBuilder,
+)
 from wyzer.conversation import ConversationManager, SessionContextManager
 from wyzer.events import EventLedger
 from wyzer.memory import MemoryStore, SensitiveMemoryError
@@ -54,7 +59,7 @@ from wyzer.workers import ToolExecutor
 _YES = re.compile(r"^\s*(?:yes|yep|yeah|do it|go ahead|continue|proceed|sure)\s*[.!]?\s*$", re.I)
 _NO = re.compile(r"^\s*(?:no|nope|cancel|never mind|don'?t|stop)\s*[.!]?\s*$", re.I)
 _STOP = re.compile(r"^\s*(?:stop|cancel|interrupt|never mind)\s*[.!]?\s*$", re.I)
-_HELP = re.compile(r"^\s*(?:help|commands|what can you do)\s*[?.!]?\s*$", re.I)
+_HELP = re.compile(r"^\s*(?:help|commands)\s*[?.!]?\s*$", re.I)
 _TASK_STATUS = re.compile(r"^\s*(?:task\s+)?status\s*[?.!]?\s*$", re.I)
 _PAUSE = re.compile(r"^\s*pause(?:\s+task)?\s*[.!]?\s*$", re.I)
 _RESUME = re.compile(r"^\s*resume(?:\s+task)?\s*[.!]?\s*$", re.I)
@@ -114,6 +119,10 @@ class Orchestrator:
         self._maximum_coordination_rounds = max(4, maximum_tool_rounds)
         self._tool_context = ToolResultContextBuilder(tool_result_context_characters)
         self._prompts = SystemPromptBuilder(personality=personality)
+        self._capability_context = CapabilityContextBuilder(
+            registry,
+            OrchestratorFeatures(persistent_complex_task_planning=tasks is not None),
+        )
         self._detailed_output_tokens = detailed_output_tokens
         self._confirmation_policy = confirmation_policy or ConfirmationPolicy()
         self._memory = memory
@@ -1008,6 +1017,9 @@ class Orchestrator:
             self.world.snapshot(),
             conversation,
             session_context=self.session_context.model_context(),
+            capability_context=self._capability_context.build(
+                tuple(sorted(self._active_capabilities))
+            ),
         )
         messages = [ChatMessage(role="system", content=system)]
         task_context = self._tasks.context() if self._tasks is not None else None
