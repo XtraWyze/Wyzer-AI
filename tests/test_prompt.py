@@ -53,6 +53,28 @@ def test_system_prompt_contains_bounded_recent_application_and_window_context() 
     assert '"tone":"warm"' in prompt
 
 
+def test_system_prompt_uses_session_context_without_duplicating_legacy_recent_lists() -> None:
+    conversation = ConversationState(
+        recently_mentioned_applications=["legacy duplicate"],
+        recently_mentioned_files=[r"C:\legacy.txt"],
+    )
+    session_context = {
+        "active_window": {"kind": "window", "name": "Notepad", "handle": 44},
+        "recent_actions": [{"tool": "open_application", "ok": True, "target": "Notepad"}],
+    }
+
+    prompt = SystemPromptBuilder().build(
+        WorldStateSnapshot(), conversation, session_context=session_context
+    )
+
+    assert '"session_context"' in prompt
+    assert "Notepad" in prompt
+    assert "legacy duplicate" not in prompt
+    assert r"C:\legacy.txt" not in prompt
+    assert "Resolve references" in prompt
+    assert "never pass a pronoun as a target" in prompt
+
+
 def test_system_prompt_requires_live_rechecks_without_dumping_broad_window_state() -> None:
     world = WorldStateSnapshot(
         known_open_windows=[

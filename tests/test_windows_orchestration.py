@@ -42,14 +42,16 @@ def test_unverified_launch_result_is_available_to_model_without_fake_success() -
     assert '"verified":false' in (provider.requests[1][0][-1].content or "")
 
 
-def test_pronoun_minimize_repairs_generic_name_to_recent_application() -> None:
+def test_model_resolves_pronoun_minimize_to_recent_application() -> None:
     backend = FakeWindowsBackend()
     registry = create_default_registry(backend)
     provider = FakeChatProvider(
         [
             tool_response(("open_application", {"application": "Calculator"})),
             text_response("Calculator is open."),
-            tool_response(("control_named_window", {"window": "it", "action": "minimize"})),
+            tool_response(
+                ("control_named_window", {"window": "Calculator", "action": "minimize"})
+            ),
             text_response("Calculator is minimized."),
         ]
     )
@@ -62,9 +64,9 @@ def test_pronoun_minimize_repairs_generic_name_to_recent_application() -> None:
     calculator = next(window for window in backend.windows if window.title == "Calculator")
     assert calculator.minimized is True
     execution_messages = provider.requests[3][0]
-    repaired_call = execution_messages[-2].tool_calls[0]
-    assert repaired_call.function.name == "control_named_window"
-    assert repaired_call.function.arguments == {
+    resolved_call = execution_messages[-2].tool_calls[0]
+    assert resolved_call.function.name == "control_named_window"
+    assert resolved_call.function.arguments == {
         "window": "Calculator",
         "action": "minimize",
     }
@@ -149,7 +151,7 @@ def test_close_it_keeps_calculator_identity_and_recovers_background_close() -> N
     assert repaired_call.function.arguments["window"] == "Calculator"
 
 
-def test_pronoun_monitor_move_repairs_generic_name_and_preserves_spatial_destination() -> None:
+def test_model_resolves_pronoun_monitor_move_and_preserves_spatial_destination() -> None:
     backend = FakeWindowsBackend()
     registry = create_default_registry(backend)
     provider = FakeChatProvider(
@@ -160,7 +162,7 @@ def test_pronoun_monitor_move_repairs_generic_name_and_preserves_spatial_destina
                 (
                     "move_named_window_to_monitor",
                     {
-                        "window": "it",
+                        "window": "Calculator",
                         "destination": {"relation": "right"},
                     },
                 )
@@ -177,9 +179,40 @@ def test_pronoun_monitor_move_repairs_generic_name_and_preserves_spatial_destina
     calculator = next(window for window in backend.windows if window.title == "Calculator")
     assert calculator.monitor_id == "monitor:2"
     execution_messages = provider.requests[3][0]
-    repaired_call = execution_messages[-2].tool_calls[0]
-    assert repaired_call.function.name == "move_named_window_to_monitor"
-    assert repaired_call.function.arguments == {
+    resolved_call = execution_messages[-2].tool_calls[0]
+    assert resolved_call.function.name == "move_named_window_to_monitor"
+    assert resolved_call.function.arguments == {
         "window": "Calculator",
         "destination": {"relation": "right"},
     }
+
+
+def test_ordered_multi_tool_window_sequence_updates_session_after_each_result() -> None:
+    backend = FakeWindowsBackend()
+    registry = create_default_registry(backend)
+    provider = FakeChatProvider(
+        [
+            tool_response(
+                ("open_application", {"application": "Notepad"}),
+                (
+                    "move_named_window_to_monitor",
+                    {"window": "Notepad", "destination": {"relation": "other"}},
+                ),
+            ),
+            text_response("Notepad is open on monitor 2."),
+        ]
+    )
+    assistant = Orchestrator(registry, InProcessExecutor(registry), provider)
+
+    response = asyncio.run(assistant.handle("Open Notepad and move it to the other monitor"))
+
+    assert response.text == "Notepad is open on monitor 2."
+    snapshot = assistant.session_context.snapshot()
+    assert snapshot.active_window is not None
+    assert snapshot.active_window.name == "Notepad"
+    assert snapshot.last_monitor is not None
+    assert snapshot.last_monitor.number == 2
+    assert [action.tool for action in snapshot.recent_actions] == [
+        "open_application",
+        "move_named_window_to_monitor",
+    ]

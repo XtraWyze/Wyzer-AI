@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from wyzer.app.tool_context import ToolResultContextBuilder
 from wyzer.brain import ChatProvider, SystemPromptBuilder
-from wyzer.conversation import ConversationManager
+from wyzer.conversation import ConversationManager, SessionContextManager
 from wyzer.events import EventLedger
 from wyzer.memory import MemoryStore, SensitiveMemoryError
 from wyzer.models import (
@@ -65,20 +65,6 @@ _HELP_TEXT = (
     "to interrupt, 'task status', 'pause', or 'resume' for longer work, and 'quit' or "
     "'exit' to close the terminal."
 )
-_GENERIC_WINDOW_NAMES = {
-    "it",
-    "that",
-    "this",
-    "window",
-    "the window",
-    "that window",
-    "this window",
-    "current window",
-    "the current window",
-    "the app",
-    "that app",
-    "this app",
-}
 _DETAILED_RESPONSE_REQUEST = re.compile(
     r"\b(?:in\s+detail|detailed|thorough(?:ly)?|comprehensive|deep\s+dive|"
     r"walk\s+me\s+through|step[- ]by[- ]step|explain\s+(?:more|fully))\b",
@@ -105,6 +91,7 @@ class Orchestrator:
         ledger: EventLedger | None = None,
         world: WorldStateManager | None = None,
         conversation: ConversationManager | None = None,
+        session_context: SessionContextManager | None = None,
         confirmation_policy: ConfirmationPolicy | None = None,
         memory: MemoryStore | None = None,
         tasks: TaskStateStore | None = None,
@@ -117,6 +104,7 @@ class Orchestrator:
         self.ledger = ledger or EventLedger()
         self.world = world or WorldStateManager()
         self.conversation = conversation or ConversationManager()
+        self.session_context = session_context or SessionContextManager()
         self._executor = executor
         self._provider = provider
         self._maximum_tool_rounds = maximum_tool_rounds
@@ -320,7 +308,7 @@ class Orchestrator:
                         text=f"The local model could not respond: {error}", action_id=action_id
                     )
                 )
-            message = self._repair_window_tool_calls(provider_response.message)
+            message = provider_response.message
             if plan_completed and message.tool_calls:
                 return self._finish_response(
                     AssistantResponse(
@@ -395,76 +383,6 @@ class Orchestrator:
             if confirmation is not None:
                 return confirmation
 
-    def _repair_window_tool_calls(self, message: ChatMessage) -> ChatMessage:
-        """Convert fragile pronoun/handle window calls into live named-window calls.
-
-        The model may reuse an HWND returned during application launch. Windows can replace that
-        handle before the next voice turn. Repairing the call here preserves LLM-first intent
-        selection while making execution depend on a stable application/window identity.
-        """
-        if not message.tool_calls:
-            return message
-        repaired = [self._repair_window_tool_call(call) for call in message.tool_calls]
-        if repaired == message.tool_calls:
-            return message
-        return message.model_copy(update={"tool_calls": repaired})
-
-    def _repair_window_tool_call(self, call: NativeToolCall) -> NativeToolCall:
-        name = call.function.name
-        arguments = dict(call.function.arguments)
-        target = self._recent_window_target()
-        if not target:
-            return call
-
-        if name == "control_named_window":
-            raw_window = str(arguments.get("window") or "").strip()
-            if self._is_generic_window_name(raw_window):
-                arguments["window"] = target
-                return call.model_copy(
-                    update={"function": NativeFunctionCall(name=name, arguments=arguments)}
-                )
-            return call
-
-        if name == "move_named_window_to_monitor":
-            raw_window = str(arguments.get("window") or "").strip()
-            if self._is_generic_window_name(raw_window):
-                arguments["window"] = target
-                return call.model_copy(
-                    update={"function": NativeFunctionCall(name=name, arguments=arguments)}
-                )
-            return call
-
-        return call
-
-    def _recent_window_target(self) -> str | None:
-        conversation = self.conversation.snapshot()
-        last_action = conversation.last_action or {}
-        target = last_action.get("target")
-        if isinstance(target, str) and target.strip():
-            return self._friendly_window_name(target)
-        for window in reversed(conversation.recently_referenced_windows):
-            candidate = window.title or window.application
-            if candidate:
-                return self._friendly_window_name(candidate)
-        for application in reversed(conversation.recently_mentioned_applications):
-            if application.strip():
-                return self._friendly_window_name(application)
-        foreground = self.world.snapshot().foreground_window
-        if foreground is not None:
-            candidate = foreground.title or foreground.application
-            if candidate:
-                return self._friendly_window_name(candidate)
-        return None
-
-    @staticmethod
-    def _friendly_window_name(value: str) -> str:
-        cleaned = value.strip()
-        return cleaned[:-4] if cleaned.casefold().endswith(".exe") else cleaned
-
-    @staticmethod
-    def _is_generic_window_name(value: str) -> bool:
-        return " ".join(value.casefold().split()) in _GENERIC_WINDOW_NAMES
-
     async def _execute_calls(
         self,
         action_id: UUID,
@@ -498,7 +416,7 @@ class Orchestrator:
             step_id = confirmed_step if index == 0 and confirmed_step is not None else uuid4()
             if call.function.name in TASK_ARGUMENT_TYPES:
                 result = self._execute_task_call(call, action_id, step_id)
-                self._record_result(result, call.id)
+                self._record_result(result, call.id, arguments=call.function.arguments)
                 if not result.ok:
                     self._skip_sequence_tail(
                         ordered_calls[index + 1 :], action_id, failed=result
@@ -507,7 +425,12 @@ class Orchestrator:
                 continue
             if self.registry.is_capability_coordination_tool(call.function.name):
                 result = self._execute_capability_call(call, action_id, step_id)
-                self._record_result(result, call.id, task_evidence=False)
+                self._record_result(
+                    result,
+                    call.id,
+                    arguments=call.function.arguments,
+                    task_evidence=False,
+                )
                 if not result.ok:
                     self._skip_sequence_tail(
                         ordered_calls[index + 1 :], action_id, failed=result
@@ -526,7 +449,12 @@ class Orchestrator:
                         "evidence is attached to the correct step."
                     ),
                 )
-                self._record_result(result, call.id, task_evidence=False)
+                self._record_result(
+                    result,
+                    call.id,
+                    arguments=call.function.arguments,
+                    task_evidence=False,
+                )
                 self._skip_sequence_tail(ordered_calls[index + 1 :], action_id, failed=result)
                 break
             if self._current_step_needs_verification(action_id):
@@ -546,7 +474,12 @@ class Orchestrator:
                             "mutating capability action."
                         ),
                     )
-                    self._record_result(result, call.id, task_evidence=False)
+                    self._record_result(
+                        result,
+                        call.id,
+                        arguments=call.function.arguments,
+                        task_evidence=False,
+                    )
                     self._skip_sequence_tail(
                         ordered_calls[index + 1 :], action_id, failed=result
                     )
@@ -558,7 +491,9 @@ class Orchestrator:
                 visible_call_names=visible_call_names,
             )
             if invalid_result is not None:
-                self._record_result(invalid_result, call.id)
+                self._record_result(
+                    invalid_result, call.id, arguments=call.function.arguments
+                )
                 self._skip_sequence_tail(
                     ordered_calls[index + 1 :], action_id, failed=invalid_result
                 )
@@ -587,7 +522,7 @@ class Orchestrator:
                     AssistantResponse(text=pending.prompt, action_id=action_id), local=True
                 )
             result = await self._execute_tool(call, validated, action_id, step_id)
-            self._record_result(result, call.id)
+            self._record_result(result, call.id, arguments=validated)
             if not result.ok:
                 self._skip_sequence_tail(ordered_calls[index + 1 :], action_id, failed=result)
                 break
@@ -614,7 +549,12 @@ class Orchestrator:
                 ),
                 details={"failed_tool": failed.tool, "failed_code": failed_code},
             )
-            self._record_result(result, call.id, task_evidence=False)
+            self._record_result(
+                result,
+                call.id,
+                arguments=call.function.arguments,
+                task_evidence=False,
+            )
 
     def _completed_plan_for(self, action_id: UUID) -> bool:
         plan = self._tasks.snapshot() if self._tasks is not None else None
@@ -679,6 +619,7 @@ class Orchestrator:
                     ),
                 ),
                 call.id,
+                arguments=call.function.arguments,
             )
 
     def _confirmation_inspection(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -987,11 +928,19 @@ class Orchestrator:
         result: ToolResult,
         tool_call_id: str | None,
         *,
+        arguments: dict[str, Any] | None = None,
         task_evidence: bool = True,
     ) -> None:
         context = self._tool_context.build(result)
+        before = self.world.snapshot()
         self.world.record_tool_result(result)
         self.world.apply_tool_observation(result)
+        self.session_context.record_tool_result(
+            result,
+            arguments,
+            before=before,
+            after=self.world.snapshot(),
+        )
         self.conversation.record_tool_result(result, context, tool_call_id)
         verification = self._verification_from_evidence(result)
         if verification is not None:
@@ -1055,7 +1004,11 @@ class Orchestrator:
 
     def _provider_messages(self) -> list[ChatMessage]:
         conversation = self.conversation.snapshot()
-        system = self._prompts.build(self.world.snapshot(), conversation)
+        system = self._prompts.build(
+            self.world.snapshot(),
+            conversation,
+            session_context=self.session_context.model_context(),
+        )
         messages = [ChatMessage(role="system", content=system)]
         task_context = self._tasks.context() if self._tasks is not None else None
         if task_context is not None:
