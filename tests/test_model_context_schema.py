@@ -17,6 +17,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "activate_managed_browser_tools",
     "activate_screen_perception_tools",
     "activate_visual_target",
+    "append_text_file",
     "browser_click",
     "browser_close_tab",
     "browser_history",
@@ -38,6 +39,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "create_directory",
     "delete_path",
     "diagnose_system",
+    "edit_text_file",
     "get_current_media",
     "get_foreground_window",
     "get_monitor_layout",
@@ -66,8 +68,9 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "task_step_update",
     "type_desktop_text",
     "write_clipboard",
+    "write_text_file",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "007c5435110980828a261359d8df531771a0018520fbb5a4bca0dfe148fe0292"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "e7604c7b406556b11a41ec790d0193c05a9be089148aee0554a80725babed795"
 
 
 def _semantic_schema(value: Any) -> Any:

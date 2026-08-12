@@ -34,6 +34,8 @@ class ConfirmationPolicy:
             return True
         if definition.confirmation == ConfirmationMode.NEVER:
             return False
+        if definition.name == "write_text_file":
+            return arguments.get("overwrite") is True
         if (
             definition.name == "control_named_window"
             and arguments.get("action") == "close"
@@ -134,6 +136,8 @@ class ConfirmationPolicy:
         )
         if tool_name == "delete_path":
             return f"This will move {target} to the Recycle Bin. Should I continue?"
+        if tool_name == "write_text_file" and arguments.get("overwrite") is True:
+            return f"This will replace the existing text file {target}. Should I continue?"
         if "send" in target.casefold() or tool_name.startswith("send_"):
             return f"This will send {target}. Should I continue?"
         if arguments.get("action") == "set_value" and _CREDENTIAL.search(target):

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import codecs
+import hashlib
 import os
 import shutil
+import tempfile
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
@@ -33,6 +37,35 @@ class SearchFilesArguments(ToolArguments):
 class ReadTextFileArguments(ToolArguments):
     path: Path
     maximum_characters: int = Field(default=20_000, ge=100, le=100_000)
+
+
+class WriteTextFileArguments(ToolArguments):
+    path: Path
+    content: str = Field(max_length=1_000_000)
+    overwrite: bool = Field(
+        default=False,
+        description="Replace an existing text file; requires confirmation.",
+    )
+    create_parents: bool = False
+
+
+class EditTextFileArguments(ToolArguments):
+    path: Path
+    old_text: str = Field(min_length=1, max_length=500_000)
+    new_text: str = Field(max_length=500_000)
+    expected_occurrences: int = Field(default=1, ge=1, le=1_000)
+    expected_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-fA-F]{64}$",
+        description="Optional SHA-256 of the file bytes that must still match.",
+    )
+
+
+class AppendTextFileArguments(ToolArguments):
+    path: Path
+    content: str = Field(max_length=1_000_000)
+    create: bool = False
+    create_parents: bool = False
 
 
 class RefreshFileIndexArguments(ToolArguments):
@@ -139,6 +172,18 @@ class TextFileResult(BaseModel):
     truncated: bool
 
 
+class TextMutationResult(BaseModel):
+    operation: str
+    path: str
+    kind: str = "file"
+    created: bool
+    overwritten: bool = False
+    occurrences_changed: int | None = None
+    characters_written: int
+    sha256: str
+    summary: str
+
+
 class FileIndexResult(BaseModel):
     files: int
     content_files: int
@@ -191,6 +236,49 @@ class FileToolBase:
 
 def _resolve_path(path: Path) -> Path:
     return path.expanduser().resolve(strict=False)
+
+
+def _resolve_text_mutation_path(path: Path) -> Path:
+    expanded = path.expanduser()
+    try:
+        if expanded.is_symlink():
+            _reject_symlink(expanded)
+        resolved = expanded.resolve(strict=False)
+    except ToolExecutionError:
+        raise
+    except (OSError, RuntimeError, ValueError) as error:
+        raise ToolExecutionError(
+            "INVALID_PATH",
+            "The requested file path is invalid.",
+            details={"path": str(path)},
+        ) from error
+    if not resolved.name:
+        raise ToolExecutionError(
+            "INVALID_PATH",
+            "The requested path must identify a file, not a drive or directory root.",
+            details={"path": str(resolved)},
+        )
+    if os.name == "nt":
+        reserved = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+        for part in resolved.parts[1:]:
+            if (
+                any(character in part for character in '<>:"|?*')
+                or part.rstrip(" .") != part
+                or part.split(".", 1)[0].upper() in reserved
+            ):
+                raise ToolExecutionError(
+                    "INVALID_PATH",
+                    "The requested file path contains a name Windows does not allow.",
+                    details={"path": str(resolved)},
+                )
+    _assert_mutable(resolved)
+    if FileCatalog._sensitive(resolved):
+        raise ToolExecutionError(
+            "SENSITIVE_PATH",
+            "Wyzer will not write credential, key, or other sensitive files.",
+            details={"path": str(resolved)},
+        )
+    return resolved
 
 
 def _kind(path: Path) -> str:
@@ -273,6 +361,178 @@ def _resolve_destination(source: Path, requested: Path) -> Path:
         )
     _assert_mutable(destination)
     return destination
+
+
+_MAX_TEXT_MUTATION_BYTES = 10_000_000
+_TEXT_BOMS: tuple[tuple[bytes, str], ...] = (
+    (codecs.BOM_UTF32_LE, "utf-32-le"),
+    (codecs.BOM_UTF32_BE, "utf-32-be"),
+    (codecs.BOM_UTF8, "utf-8"),
+    (codecs.BOM_UTF16_LE, "utf-16-le"),
+    (codecs.BOM_UTF16_BE, "utf-16-be"),
+)
+
+
+def _read_existing_text(path: Path) -> tuple[bytes, str, str, bytes]:
+    if not path.exists():
+        raise ToolExecutionError(
+            "PATH_NOT_FOUND",
+            f"The file does not exist: {path}",
+            details={"path": str(path)},
+        )
+    if not path.is_file():
+        raise ToolExecutionError(
+            "NOT_A_FILE",
+            "The requested path is not a file.",
+            details={"path": str(path)},
+        )
+    _reject_symlink(path)
+    try:
+        if path.stat().st_size > _MAX_TEXT_MUTATION_BYTES:
+            raise ToolExecutionError(
+                "FILE_TOO_LARGE",
+                "The file is too large for a bounded text mutation.",
+                details={"path": str(path), "maximum_bytes": _MAX_TEXT_MUTATION_BYTES},
+            )
+        raw = path.read_bytes()
+    except ToolExecutionError:
+        raise
+    except (PermissionError, OSError) as error:
+        raise ToolExecutionError(
+            "FILE_READ_DENIED", str(error), details={"path": str(path)}
+        ) from error
+
+    encoding = "utf-8"
+    bom = b""
+    payload = raw
+    for candidate_bom, candidate_encoding in _TEXT_BOMS:
+        if raw.startswith(candidate_bom):
+            bom = candidate_bom
+            encoding = candidate_encoding
+            payload = raw[len(candidate_bom) :]
+            break
+    try:
+        text = payload.decode(encoding)
+    except UnicodeDecodeError as error:
+        raise ToolExecutionError(
+            "NOT_TEXT_FILE",
+            "The file is not valid supported text and was not modified.",
+            details={"path": str(path)},
+        ) from error
+    controls = sum(
+        ord(character) < 32 and character not in "\t\n\r"
+        for character in text
+    )
+    if "\x00" in text or (text and controls / len(text) > 0.01):
+        raise ToolExecutionError(
+            "NOT_TEXT_FILE",
+            "The file appears to be binary and was not modified.",
+            details={"path": str(path)},
+        )
+    return raw, text, encoding, bom
+
+
+def _encode_text(text: str, encoding: str, bom: bytes) -> bytes:
+    try:
+        return bom + text.encode(encoding)
+    except UnicodeEncodeError as error:
+        raise ToolExecutionError(
+            "TEXT_ENCODING_FAILED",
+            f"The updated text cannot be represented with the file's {encoding} encoding.",
+        ) from error
+
+
+def _ensure_parent(path: Path, create_parents: bool) -> None:
+    parent = path.parent
+    if parent.is_dir():
+        return
+    if parent.exists():
+        raise ToolExecutionError(
+            "PARENT_NOT_DIRECTORY",
+            "The parent path is not a directory.",
+            details={"path": str(parent)},
+        )
+    if not create_parents:
+        raise ToolExecutionError(
+            "PARENT_NOT_FOUND",
+            "The parent directory does not exist; set create_parents to create it explicitly.",
+            details={"path": str(parent)},
+        )
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError) as error:
+        raise ToolExecutionError(
+            "DIRECTORY_CREATE_FAILED", str(error), details={"path": str(parent)}
+        ) from error
+
+
+def _write_new_file(path: Path, content: bytes) -> None:
+    created = False
+    try:
+        with path.open("xb") as output:
+            created = True
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+    except FileExistsError as error:
+        raise ToolExecutionError(
+            "FILE_EXISTS",
+            "The file already exists. Set overwrite only when replacement is intended.",
+            details={"path": str(path)},
+        ) from error
+    except (PermissionError, OSError) as error:
+        if created:
+            with suppress(OSError):
+                path.unlink(missing_ok=True)
+        raise ToolExecutionError(
+            "FILE_WRITE_FAILED", str(error), details={"path": str(path)}
+        ) from error
+
+
+def _atomic_replace_if_unchanged(path: Path, original: bytes, replacement: bytes) -> None:
+    descriptor = -1
+    temporary: Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as output:
+            descriptor = -1
+            output.write(replacement)
+            output.flush()
+            os.fsync(output.fileno())
+        shutil.copymode(path, temporary)
+        try:
+            current = path.read_bytes()
+        except (FileNotFoundError, PermissionError, OSError) as error:
+            raise ToolExecutionError(
+                "FILE_CHANGED",
+                "The file changed or became unavailable before the update; nothing was replaced.",
+                retryable=True,
+                details={"path": str(path)},
+            ) from error
+        if current != original:
+            raise ToolExecutionError(
+                "FILE_CHANGED",
+                "The file changed before the update; nothing was replaced.",
+                retryable=True,
+                details={"path": str(path)},
+            )
+        os.replace(temporary, path)
+        temporary = None
+    except ToolExecutionError:
+        raise
+    except (PermissionError, OSError) as error:
+        raise ToolExecutionError(
+            "FILE_WRITE_FAILED", str(error), details={"path": str(path)}
+        ) from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temporary is not None:
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
 
 
 class SearchFilesTool(FileToolBase, Tool[SearchFilesArguments, FileSearchResult]):
@@ -664,6 +924,144 @@ class ReadTextFileTool(FileToolBase, Tool[ReadTextFileArguments, TextFileResult]
         )
 
 
+class WriteTextFileTool(FileToolBase, Tool[WriteTextFileArguments, TextMutationResult]):
+    name = "write_text_file"
+    description = "Create a UTF-8 text file, or explicitly replace an existing text file."
+    arguments_type = WriteTextFileArguments
+    result_type = TextMutationResult
+    risk_level = RiskLevel.MEDIUM
+    read_only = False
+    confirmation = ConfirmationMode.CONDITIONAL
+
+    def execute(
+        self, arguments: WriteTextFileArguments, context: ToolContext
+    ) -> TextMutationResult:
+        del context
+        path = _resolve_text_mutation_path(arguments.path)
+        _ensure_parent(path, arguments.create_parents)
+        existed = path.exists()
+        if existed and not arguments.overwrite:
+            raise ToolExecutionError(
+                "FILE_EXISTS",
+                "The file already exists. Set overwrite only when replacement is intended.",
+                details={"path": str(path)},
+            )
+        if existed:
+            original, _, encoding, bom = _read_existing_text(path)
+            replacement = _encode_text(arguments.content, encoding, bom)
+            _atomic_replace_if_unchanged(path, original, replacement)
+        else:
+            replacement = _encode_text(arguments.content, "utf-8", b"")
+            _write_new_file(path, replacement)
+        digest = hashlib.sha256(replacement).hexdigest()
+        return TextMutationResult(
+            operation="write_text_file",
+            path=str(path),
+            created=not existed,
+            overwritten=existed,
+            characters_written=len(arguments.content),
+            sha256=digest,
+            summary=("Created text file." if not existed else "Replaced existing text file."),
+        )
+
+
+class EditTextFileTool(FileToolBase, Tool[EditTextFileArguments, TextMutationResult]):
+    name = "edit_text_file"
+    description = "Replace an exact text occurrence in an existing file; fail on count mismatch."
+    arguments_type = EditTextFileArguments
+    result_type = TextMutationResult
+    risk_level = RiskLevel.MEDIUM
+    read_only = False
+
+    def execute(
+        self, arguments: EditTextFileArguments, context: ToolContext
+    ) -> TextMutationResult:
+        del context
+        path = _resolve_text_mutation_path(arguments.path)
+        original, text, encoding, bom = _read_existing_text(path)
+        original_digest = hashlib.sha256(original).hexdigest()
+        if (
+            arguments.expected_sha256 is not None
+            and arguments.expected_sha256.casefold() != original_digest
+        ):
+            raise ToolExecutionError(
+                "FILE_CHANGED",
+                "The file no longer matches the expected SHA-256; nothing was modified.",
+                retryable=True,
+                details={"path": str(path), "actual_sha256": original_digest},
+            )
+        occurrences = text.count(arguments.old_text)
+        if occurrences == 0:
+            raise ToolExecutionError(
+                "TEXT_NOT_FOUND",
+                "The exact old_text was not found; nothing was modified.",
+                retryable=True,
+                details={"path": str(path), "expected_occurrences": arguments.expected_occurrences},
+            )
+        if occurrences != arguments.expected_occurrences:
+            raise ToolExecutionError(
+                "OCCURRENCE_COUNT_MISMATCH",
+                "The exact old_text occurrence count did not match; nothing was modified.",
+                retryable=True,
+                details={
+                    "path": str(path),
+                    "expected_occurrences": arguments.expected_occurrences,
+                    "actual_occurrences": occurrences,
+                },
+            )
+        updated = text.replace(arguments.old_text, arguments.new_text)
+        replacement = _encode_text(updated, encoding, bom)
+        _atomic_replace_if_unchanged(path, original, replacement)
+        return TextMutationResult(
+            operation="edit_text_file",
+            path=str(path),
+            created=False,
+            occurrences_changed=occurrences,
+            characters_written=len(updated),
+            sha256=hashlib.sha256(replacement).hexdigest(),
+            summary=f"Replaced {occurrences} exact occurrence(s).",
+        )
+
+
+class AppendTextFileTool(FileToolBase, Tool[AppendTextFileArguments, TextMutationResult]):
+    name = "append_text_file"
+    description = "Append text without changing existing content; create only when explicitly set."
+    arguments_type = AppendTextFileArguments
+    result_type = TextMutationResult
+    risk_level = RiskLevel.MEDIUM
+    read_only = False
+
+    def execute(
+        self, arguments: AppendTextFileArguments, context: ToolContext
+    ) -> TextMutationResult:
+        del context
+        path = _resolve_text_mutation_path(arguments.path)
+        existed = path.exists()
+        if not existed and not arguments.create:
+            raise ToolExecutionError(
+                "PATH_NOT_FOUND",
+                "The file does not exist. Set create only when creating it is intended.",
+                details={"path": str(path)},
+            )
+        _ensure_parent(path, arguments.create_parents)
+        if existed:
+            original, _, encoding, _ = _read_existing_text(path)
+            appended = _encode_text(arguments.content, encoding, b"")
+            replacement = original + appended
+            _atomic_replace_if_unchanged(path, original, replacement)
+        else:
+            replacement = _encode_text(arguments.content, "utf-8", b"")
+            _write_new_file(path, replacement)
+        return TextMutationResult(
+            operation="append_text_file",
+            path=str(path),
+            created=not existed,
+            characters_written=len(arguments.content),
+            sha256=hashlib.sha256(replacement).hexdigest(),
+            summary=("Created text file with appended text." if not existed else "Appended text."),
+        )
+
+
 class RefreshFileIndexTool(FileToolBase, Tool[RefreshFileIndexArguments, FileIndexResult]):
     llm_visible = False
     name = "refresh_file_index"
@@ -693,8 +1091,8 @@ class FileToolPack:
 
     name = "files"
     description = (
-        "Search, read, list, or open named local folders/projects; create, move, copy, rename, or "
-        "delete local paths."
+        "open named local folders/projects; search/read files; write/edit/append text; "
+        "list/manage paths."
     )
     activation_name = "file"
 
@@ -707,6 +1105,9 @@ class FileToolPack:
             SearchFilesTool(self.catalog),
             ListDirectoryTool(self.catalog),
             ReadTextFileTool(self.catalog),
+            WriteTextFileTool(self.catalog),
+            EditTextFileTool(self.catalog),
+            AppendTextFileTool(self.catalog),
             CreateDirectoryTool(self.catalog),
             CopyPathTool(self.catalog),
             MovePathTool(self.catalog),
