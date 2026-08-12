@@ -74,6 +74,15 @@ class ModelToolView:
         return self.registry._native_tools_for_capabilities(self.capability_packs)
 
 
+@dataclass(frozen=True, slots=True)
+class SemanticCapability:
+    """Compact model-facing metadata for one currently usable tool pack."""
+
+    name: str
+    description: str
+    tool_count: int
+
+
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool[Any, Any]] = {}
@@ -83,6 +92,10 @@ class ToolRegistry:
         self._capability_activators: dict[str, str] = {}
         self._tool_to_pack: dict[str, str | None] = {}
         self._default_capabilities: set[str] = set()
+        self._semantic_cache_signature: (
+            tuple[tuple[str, str, tuple[str, ...]], ...] | None
+        ) = None
+        self._semantic_cache: tuple[SemanticCapability, ...] = ()
 
     def register(self, tool: Tool[Any, Any]) -> None:
         """Register one manually constructed tool.
@@ -128,6 +141,7 @@ class ToolRegistry:
         *,
         pack_name: str | None,
     ) -> None:
+        self._invalidate_semantic_cache()
         definitions = tuple(tool.definition() for tool in tools)
         names = tuple(definition.name for definition in definitions)
         duplicate_batch_names = sorted({name for name in names if names.count(name) > 1})
@@ -228,6 +242,43 @@ class ToolRegistry:
             )
         )
 
+    def semantic_capabilities(self) -> tuple[SemanticCapability, ...]:
+        """Return bounded-source semantic metadata from live registered packs.
+
+        This intentionally omits schemas and unavailable/hidden tools. The signature
+        check also refreshes the cache if a tool's runtime availability changes after
+        registry composition.
+        """
+        signature: tuple[tuple[str, str, tuple[str, ...]], ...] = tuple(
+            (
+                pack_name,
+                self._pack_descriptions[pack_name],
+                tuple(
+                    name
+                    for name in self._packs[pack_name]
+                    if self._tools[name].available
+                    and bool(getattr(self._tools[name], "llm_visible", True))
+                ),
+            )
+            for pack_name in sorted(self._packs)
+        )
+        if signature != self._semantic_cache_signature:
+            self._semantic_cache_signature = signature
+            self._semantic_cache = tuple(
+                SemanticCapability(
+                    name=pack_name,
+                    description=self._pack_descriptions[pack_name],
+                    tool_count=len(available_tools),
+                )
+                for pack_name, description, available_tools in signature
+                if description and available_tools
+            )
+        return self._semantic_cache
+
+    def _invalidate_semantic_cache(self) -> None:
+        self._semantic_cache_signature = None
+        self._semantic_cache = ()
+
     def finalize_capability_activation_surface(self) -> None:
         """Generate one zero-argument activator per optional registered pack."""
         if self._capability_activators:
@@ -248,6 +299,7 @@ class ToolRegistry:
         self._register_many(tuple(tools), pack_name=None)
         self._tools[LIST_CAPABILITIES_TOOL].llm_visible = False
         self._tools[ACTIVATE_CAPABILITY_TOOL].llm_visible = False
+        self._invalidate_semantic_cache()
 
     def activation_capability(self, tool_name: str) -> str | None:
         return self._capability_activators.get(tool_name)

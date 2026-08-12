@@ -11,7 +11,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from wyzer.brain import SystemPromptBuilder, create_chat_provider
+from wyzer.brain import (
+    CapabilityContextBuilder,
+    OrchestratorFeatures,
+    SystemPromptBuilder,
+    create_chat_provider,
+)
 from wyzer.config import WyzerSettings
 from wyzer.models import ChatMessage, ConversationState, WorldStateSnapshot
 from wyzer.tasks.tools import task_native_tools
@@ -31,6 +36,8 @@ class AcceptanceCase(BaseModel):
     prompt: str = Field(min_length=1, max_length=2_000)
     expected_tools: list[str] = Field(default_factory=list)
     forbidden_tools: list[str] = Field(default_factory=list)
+    required_response_concepts: list[list[str]] = Field(default_factory=list)
+    forbidden_response_terms: list[str] = Field(default_factory=list)
 
 
 class CaseResult(BaseModel):
@@ -44,6 +51,8 @@ class CaseResult(BaseModel):
     forbidden_tools_seen: list[str]
     latency_ms: int
     response_text: str
+    missing_response_concepts: list[list[str]] = Field(default_factory=list)
+    forbidden_response_terms_seen: list[str] = Field(default_factory=list)
     error: str | None = None
 
 
@@ -111,7 +120,14 @@ async def evaluate(
 
     personality = settings.personality.model_dump(mode="json")
     system_prompt = SystemPromptBuilder(personality=personality).build(
-        WorldStateSnapshot(), ConversationState()
+        WorldStateSnapshot(),
+        ConversationState(),
+        capability_context=CapabilityContextBuilder(
+            registry,
+            OrchestratorFeatures(
+                persistent_complex_task_planning=settings.task_engine.enabled
+            ),
+        ).build(),
     )
     results: list[CaseResult] = []
     for case in cases:
@@ -292,7 +308,23 @@ async def evaluate(
                 actual = direct_sequence or trace[-1:]
 
             forbidden_seen = [name for name in actual if name in case.forbidden_tools]
-            passed = actual == case.expected_tools and not forbidden_seen
+            normalized_response = " ".join(response_text.casefold().split())
+            missing_concepts = [
+                alternatives
+                for alternatives in case.required_response_concepts
+                if not any(term.casefold() in normalized_response for term in alternatives)
+            ]
+            forbidden_terms_seen = [
+                term
+                for term in case.forbidden_response_terms
+                if term.casefold() in normalized_response
+            ]
+            passed = (
+                actual == case.expected_tools
+                and not forbidden_seen
+                and not missing_concepts
+                and not forbidden_terms_seen
+            )
             results.append(
                 CaseResult(
                     case_id=case.case_id,
@@ -303,6 +335,8 @@ async def evaluate(
                     forbidden_tools_seen=forbidden_seen,
                     latency_ms=round((time.perf_counter() - started) * 1_000),
                     response_text=response_text,
+                    missing_response_concepts=missing_concepts,
+                    forbidden_response_terms_seen=forbidden_terms_seen,
                 )
             )
         except Exception as error:
@@ -345,6 +379,13 @@ def _print_summary(report: AcceptanceReport) -> None:
             print(f"       trace: {', '.join(result.tool_trace) or 'text response'}")
         if result.error:
             print(f"       error: {result.error}")
+        if result.missing_response_concepts:
+            print(f"       missing concepts: {result.missing_response_concepts}")
+        if result.forbidden_response_terms_seen:
+            print(
+                "       forbidden response terms: "
+                + ", ".join(result.forbidden_response_terms_seen)
+            )
     print(
         f"Model acceptance: {report.passed}/{report.total} "
         f"({report.pass_rate:.1%}); required {report.minimum_pass_rate:.1%}"

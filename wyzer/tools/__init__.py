@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from wyzer.tools.base import Tool, ToolContext, ToolExecutionError
-from wyzer.tools.registry import ModelToolView, ToolRegistry
+from wyzer.tools.registry import ModelToolView, SemanticCapability, ToolRegistry
 
 TOOL_PACK_ENTRYPOINT_GROUP = "wyzer.tool_packs"
 
@@ -67,6 +67,7 @@ __all__ = [
     "TOOL_PACK_ENTRYPOINT_GROUP",
     "CallableTool",
     "ModelToolView",
+    "SemanticCapability",
     "SimpleToolPack",
     "Tool",
     "ToolContext",

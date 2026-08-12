@@ -4,12 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from tests.fakes import tool_response
+from tests.fakes import text_response, tool_response
 from wyzer.brain import FakeChatProvider
 from wyzer.config import WyzerSettings
 from wyzer.model_acceptance import AcceptanceCase, evaluate, load_cases
 
 CASES_PATH = Path(__file__).parents[1] / "evals" / "model_acceptance.json"
+CAPABILITY_CASES_PATH = Path(__file__).parents[1] / "evals" / "capability_awareness.json"
 
 
 def test_model_acceptance_cases_are_valid_and_cover_key_routes() -> None:
@@ -47,6 +48,80 @@ def test_model_acceptance_case_ids_must_be_unique(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unique"):
         load_cases(path)
+
+
+def test_capability_awareness_cases_cover_requested_conversations() -> None:
+    cases = load_cases(CAPABILITY_CASES_PATH)
+
+    assert len(cases) == 8
+    assert all(not case.expected_tools for case in cases)
+    assert all(case.required_response_concepts for case in cases)
+    assert "native_text_file_editing" in {case.case_id for case in cases}
+
+
+def test_acceptance_checks_semantic_response_concepts_and_runtime_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeChatProvider(
+        [
+            text_response(
+                "Yes. I choose the appropriate available tools from the requested outcome."
+            )
+        ]
+    )
+    monkeypatch.setattr("wyzer.model_acceptance.create_chat_provider", lambda *args: provider)
+    settings = WyzerSettings.load(CASES_PATH.parents[1] / "wyzer.toml")
+
+    report = asyncio.run(
+        evaluate(
+            settings,
+            [
+                AcceptanceCase(
+                    case_id="semantic_capability_answer",
+                    prompt="Can you choose tools?",
+                    required_response_concepts=[
+                        ["yes"],
+                        ["choose", "select"],
+                        ["tool"],
+                    ],
+                    forbidden_response_terms=["cannot choose"],
+                )
+            ],
+            minimum_pass_rate=1.0,
+        )
+    )
+
+    assert report.pass_rate == 1.0
+    system_prompt = provider.requests[0][0][0].content or ""
+    assert "RUNTIME_CAPABILITY_CONTEXT" in system_prompt
+    assert "files: open named local folders/projects" in system_prompt
+
+
+def test_acceptance_reports_missing_and_forbidden_response_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeChatProvider([text_response("No, I cannot choose tools.")])
+    monkeypatch.setattr("wyzer.model_acceptance.create_chat_provider", lambda *args: provider)
+    settings = WyzerSettings.load(CASES_PATH.parents[1] / "wyzer.toml")
+
+    report = asyncio.run(
+        evaluate(
+            settings,
+            [
+                AcceptanceCase(
+                    case_id="bad_capability_answer",
+                    prompt="Can you choose tools?",
+                    required_response_concepts=[["yes"], ["choose"]],
+                    forbidden_response_terms=["cannot choose"],
+                )
+            ],
+            minimum_pass_rate=1.0,
+        )
+    )
+
+    assert report.pass_rate == 0.0
+    assert report.results[0].missing_response_concepts == [["yes"]]
+    assert report.results[0].forbidden_response_terms_seen == ["cannot choose"]
 
 
 def test_acceptance_simulates_discovery_activation_and_final_decision(

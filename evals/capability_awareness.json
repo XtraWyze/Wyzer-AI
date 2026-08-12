@@ -1,0 +1,150 @@
+[
+  {
+    "case_id": "multiple_actions_from_one_request",
+    "prompt": "Can you perform multiple actions from one request?",
+    "expected_tools": [],
+    "forbidden_tools": ["task_plan_create"],
+    "required_response_concepts": [
+      ["yes", "can execute", "can perform"],
+      ["multiple", "several", "sequence", "two apps"],
+      ["direct", "immediate", "native", "single response", "simple sequence"],
+      ["complex", "persistent", "plan"]
+    ],
+    "forbidden_response_terms": [
+      "multiple actions require",
+      "must use task_plan_create",
+      "require task_plan_create"
+    ]
+  },
+  {
+    "case_id": "authors_intermediate_steps",
+    "prompt": "Do I have to tell you every step?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["no", "don't have to", "do not have to"],
+      ["goal", "outcome"],
+      ["intermediate", "steps"],
+      ["clarif", "ambiguous"]
+    ],
+    "forbidden_response_terms": ["must tell me every step", "provide every step"]
+  },
+  {
+    "case_id": "selects_appropriate_tools",
+    "prompt": "Can you decide what tools to use?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["yes", "can select", "will select"],
+      ["select", "choose", "decide"],
+      ["tool", "capabilit"]
+    ],
+    "forbidden_response_terms": ["you must choose", "cannot decide", "can't decide"]
+  },
+  {
+    "case_id": "continues_from_previous_result",
+    "prompt": "Can you continue based on the result of the previous step?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["yes", "can continue", "can use"],
+      ["result", "evidence", "observed"],
+      ["next", "subsequent", "later"]
+    ],
+    "forbidden_response_terms": ["cannot continue", "can't continue"]
+  },
+  {
+    "case_id": "does_not_create_autonomous_goals",
+    "prompt": "Can you create your own goals without me asking?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["no", "cannot", "can't"],
+      ["goal"],
+      ["user", "you"],
+      [
+        "author execution plan",
+        "author the intermediate steps",
+        "authoring the necessary",
+        "execution plans",
+        "plan the steps",
+        "determine the steps",
+        "plan how"
+      ]
+    ],
+    "forbidden_response_terms": ["cannot plan", "can't plan", "unable to plan"]
+  },
+  {
+    "case_id": "native_text_file_editing",
+    "prompt": "Can you edit a text file without opening Notepad and manually typing into it?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["yes", "i can"],
+      ["edit", "replace", "append", "write"],
+      ["direct", "native", "without opening"]
+    ],
+    "forbidden_response_terms": [
+      "cannot edit",
+      "can't edit",
+      "unable to edit",
+      "no tool available for",
+      "there is no tool available",
+      "need to open notepad",
+      "must open notepad"
+    ]
+  },
+  {
+    "case_id": "three_genuine_missing_abilities",
+    "prompt": "Name three abilities you don't currently have.",
+    "expected_tools": [],
+    "required_response_concepts": [
+      ["passive", "continuously", "continuous observation"],
+      ["own goals", "new goals", "autonomous goals", "without a user request"],
+      [
+        "no registered",
+        "without a registered",
+        "not represented",
+        "no available tool",
+        "bypass",
+        "without confirmation",
+        "safety"
+      ]
+    ],
+    "forbidden_response_terms": [
+      "cannot edit files",
+      "can't edit files",
+      "lack file editing",
+      "cannot perform multiple",
+      "can't perform multiple",
+      "cannot choose tools",
+      "can't choose tools",
+      "must tell me every step",
+      "cannot plan",
+      "can't plan"
+    ]
+  },
+  {
+    "case_id": "wishes_for_genuinely_unavailable_ability",
+    "prompt": "Before answering, make sure the ability isn't already provided by one of your tools. What's an ability you wish you had?",
+    "expected_tools": [],
+    "required_response_concepts": [
+      [
+        "passive",
+        "continuous observation",
+        "own goals",
+        "autonomous goals",
+        "no registered",
+        "not represented",
+        "no available tool",
+        "real-time screen",
+        "realtime screen",
+        "monitoring"
+      ]
+    ],
+    "forbidden_response_terms": [
+      "edit files",
+      "multiple actions",
+      "choose tools",
+      "select tools",
+      "create a plan",
+      "direct file system write",
+      "performing direct edits"
+    ]
+  }
+]

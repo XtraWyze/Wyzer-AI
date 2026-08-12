@@ -19,6 +19,31 @@ def test_system_prompt_is_concise_and_describes_native_tool_behavior() -> None:
     assert "output_schema" not in prompt
 
 
+def test_system_prompt_grounds_self_awareness_in_runtime_capability_context() -> None:
+    capability_context = """SELF_CAPABILITIES
+direct_multi_tool_execution=yes
+authors_intermediate_steps=yes
+ACTIVE_CAPABILITIES
+files: search/read and write/edit text files"""
+
+    prompt = SystemPromptBuilder().build(
+        WorldStateSnapshot(),
+        ConversationState(),
+        capability_context=capability_context,
+    )
+
+    assert "Registered active tools and activatable tool packs are your abilities" in prompt
+    assert "needing to call a tool means you can perform its ability" in prompt
+    assert "answer informationally from RUNTIME_CAPABILITY_CONTEXT" in prompt
+    assert "without calling action, activation, or planning tools merely to answer" in prompt
+    assert "user normally supplies the goal or outcome" in prompt
+    assert "determine intermediate actions, tools, arguments, order, and dependencies" in prompt
+    assert "Clarification may be needed when the desired outcome is ambiguous" in prompt
+    assert "Do not invent and initiate new goals" in prompt
+    assert "Use observed results from earlier calls" in prompt
+    assert capability_context in prompt
+
+
 def test_system_prompt_distinguishes_managed_and_personal_chrome() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 

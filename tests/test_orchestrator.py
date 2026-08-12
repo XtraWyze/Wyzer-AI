@@ -90,6 +90,19 @@ def test_help_is_local_and_lists_commands() -> None:
     assert provider.requests == []
 
 
+def test_what_can_you_do_is_llm_driven_and_receives_runtime_capabilities() -> None:
+    provider = FakeChatProvider([text_response("I can use my registered capabilities.")])
+    assistant = build_assistant(ToolRegistry(), provider)
+
+    response = asyncio.run(assistant.handle("What can you do?"))
+
+    assert response.text == "I can use my registered capabilities."
+    assert len(provider.requests) == 1
+    system_prompt = provider.requests[0][0][0].content or ""
+    assert "RUNTIME_CAPABILITY_CONTEXT" in system_prompt
+    assert "SELF_CAPABILITIES" in system_prompt
+
+
 def test_simple_action_executes_without_confirmation_and_returns_tool_message() -> None:
     registry = ToolRegistry()
     registry.register(OpenApplicationTool())

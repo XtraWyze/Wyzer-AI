@@ -7,7 +7,7 @@ import json
 from collections import defaultdict
 from typing import Any
 
-from wyzer.brain import SystemPromptBuilder
+from wyzer.brain import CapabilityContextBuilder, OrchestratorFeatures, SystemPromptBuilder
 from wyzer.models import ConversationState, WorldStateSnapshot
 from wyzer.tasks.tools import task_native_tools
 from wyzer.tools import create_default_registry
@@ -19,7 +19,14 @@ def _serialized(value: Any) -> str:
 
 def measure(activated_capabilities: tuple[str, ...] = ()) -> dict[str, Any]:
     registry = create_default_registry()
-    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+    capability_context = CapabilityContextBuilder(
+        registry, OrchestratorFeatures(persistent_complex_task_planning=True)
+    ).build(activated_capabilities)
+    prompt = SystemPromptBuilder().build(
+        WorldStateSnapshot(),
+        ConversationState(),
+        capability_context=capability_context,
+    )
     view = registry.model_view(activated_capabilities)
     capability_tools = view.native_tools()
     all_capability_tools = registry.all_native_tools()
@@ -47,6 +54,8 @@ def measure(activated_capabilities: tuple[str, ...] = ()) -> dict[str, Any]:
         "activated_capabilities": list(view.activated_capabilities),
         "visible_capability_packs": list(view.capability_packs),
         "system_prompt_characters": len(prompt),
+        "capability_context_characters": len(capability_context),
+        "capability_context_approximate_tokens": round(len(capability_context) / 4),
         "tool_schema_characters": len(schemas),
         "all_tool_schema_characters": len(all_schemas),
         "tool_schema_approximate_tokens": round(len(schemas) / 4),
@@ -87,6 +96,11 @@ def main() -> None:
     )
     print(f"Activated capabilities: {result['activated_capabilities'] or 'none'}")
     print(f"System prompt: {result['system_prompt_characters']:,} chars")
+    print(
+        "Capability context: "
+        f"{result['capability_context_characters']:,} chars / "
+        f"~{result['capability_context_approximate_tokens']:,} tokens"
+    )
     print(f"Tool schemas: {result['tool_schema_characters']:,} chars")
     print(f"Total: {result['total_characters']:,} chars")
     print(f"Approximate tokens (chars / 4): {result['approximate_tokens']:,}")

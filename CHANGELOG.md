@@ -2,6 +2,25 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.2] - 2026-08-12
+
+### Added
+
+- Add a bounded runtime self-capability context generated from registered tool-pack metadata,
+  current activation state, runtime availability, and orchestrator features without injecting
+  hidden tool schemas.
+- Add semantic model acceptance coverage for multi-action execution, authored intermediate steps,
+  tool selection, result-driven continuation, autonomous-goal limits, and native text editing.
+
+### Fixed
+
+- Prevent capability questions from treating tool use or activation as evidence that an ability is
+  missing, or from assuming that every multi-action request requires a persistent task plan.
+- Distinguish ambiguous outcomes from missing capabilities, autonomous goal creation from planning
+  a user-provided goal, and on-demand observation from continuous passive monitoring.
+- Route “what can you do?” through the LLM and authoritative runtime capability context instead of
+  the legacy static help response.
+
 ## [0.2.1] - 2026-08-12
 
 ### Added
