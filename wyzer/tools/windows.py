@@ -344,7 +344,10 @@ class NamedWindowActionArguments(ToolArguments):
     )
     all_matches: bool = Field(
         default=False,
-        description="Apply to all matches instead of one unique match.",
+        description=(
+            "Apply to every match only when the user explicitly requests all matching windows; "
+            "otherwise leave false so multiple matches can be disambiguated."
+        ),
     )
 
 
@@ -1250,9 +1253,9 @@ class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
 class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, WindowActionResult]):
     name = "control_named_window"
     description = (
-        "Focus, minimize, maximize, restore, or close a named ordinary desktop window directly. "
-        "Includes personal Chrome; never controls Wyzer's managed browser; no preliminary window "
-        "check is needed."
+        "Focus, minimize, maximize, restore, or close a desktop window. For close only, unqualified "
+        "Chrome includes personal windows and Wyzer's managed browser; one candidate closes directly "
+        "and multiple candidates are reported for choice."
     )
     arguments_type = NamedWindowActionArguments
     result_type = WindowActionResult
@@ -1265,6 +1268,10 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
     ) -> WindowActionResult:
         del context
         query = arguments.window.casefold().strip()
+        compact_query = "".join(character for character in query if character.isalnum())
+        unqualified_chrome_close = (
+            arguments.action == "close" and compact_query in {"chrome", "googlechrome"}
+        )
         lookup_timeout = min(1.5, float(getattr(self.backend, "verification_timeout_seconds", 1.5)))
         deadline = time.monotonic() + lookup_timeout
         candidates = _exclude_non_user_windows(self.backend.find_windows(query))
@@ -1272,8 +1279,29 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
             time.sleep(0.05)
             candidates = _exclude_non_user_windows(self.backend.find_windows(query))
         candidates = _prefer_direct_application_windows(candidates, query)
-        candidates = _exclude_managed_browser_windows(candidates)
-        compact_query = "".join(character for character in query if character.isalnum())
+        managed_ids: set[int] = set()
+        if unqualified_chrome_close:
+            from wyzer.tools.browser import managed_browser_process_ids
+
+            managed_ids = managed_browser_process_ids()
+            chrome_candidates = [
+                window
+                for window in candidates
+                if (window.application or "").casefold() in {"chrome", "chrome.exe"}
+            ]
+            if chrome_candidates:
+                candidates = chrome_candidates
+            consolidated: list[WindowInfo] = []
+            managed_browser_added = False
+            for window in candidates:
+                if window.process_id in managed_ids:
+                    if managed_browser_added:
+                        continue
+                    managed_browser_added = True
+                consolidated.append(window)
+            candidates = consolidated
+        else:
+            candidates = _exclude_managed_browser_windows(candidates)
         compact_workspace = "".join(
             character for character in Path.cwd().name.casefold() if character.isalnum()
         )
@@ -1303,17 +1331,30 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
                 (window.application or "").casefold().removesuffix(".exe"),
             }
         ]
-        matches = exact or candidates
+        matches = candidates if unqualified_chrome_close else (exact or candidates)
         if not matches:
             raise ToolExecutionError(
                 "WINDOW_NOT_FOUND", f"No open window matched {arguments.window}."
             )
         if len(matches) > 1 and not arguments.all_matches:
+
+            def choice_label(window: WindowInfo) -> str:
+                if window.process_id in managed_ids:
+                    return f"Wyzer managed browser — {window.title}"
+                if unqualified_chrome_close:
+                    return f"Personal Chrome — {window.title}"
+                return window.title
+
             raise ToolExecutionError(
                 "AMBIGUOUS_WINDOW",
-                f"More than one open window matched {arguments.window}.",
+                (
+                    f"More than one open window matched {arguments.window}. "
+                    f"Ask the user which "
+                    f"{'Chrome candidate' if unqualified_chrome_close else 'window title'} "
+                    f"to {arguments.action}."
+                ),
                 details={
-                    "matches": [window.title for window in matches[:10]],
+                    "matches": [choice_label(window) for window in matches[:10]],
                     "query": arguments.window,
                     "action": arguments.action,
                 },
@@ -1327,6 +1368,11 @@ class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, W
         selected = matches if arguments.all_matches else matches[:1]
 
         def close_with_focus_recovery(window: WindowInfo) -> bool:
+            if window.process_id in managed_ids:
+                from wyzer.tools.browser import stop_managed_browser
+
+                return stop_managed_browser().running is False
+
             # Most applications accept WM_CLOSE in the background. Some packaged Windows apps
             # (notably Calculator on some builds) do not process it until their top-level window
             # is activated. Try the normal non-disruptive close first, then focus and retry only

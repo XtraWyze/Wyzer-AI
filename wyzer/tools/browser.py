@@ -445,8 +445,9 @@ def _terminate_managed_browser_processes() -> None:
         psutil.wait_procs(alive, timeout=1.5)
 
 
-def _stop(arguments: NoArguments, context: ToolContext) -> BrowserStatusResult:
-    del arguments, context
+def stop_managed_browser() -> BrowserStatusResult:
+    """Stop Wyzer's managed browser through its normal verified cleanup path."""
+
     version = _json_version()
     if version is None:
         return BrowserStatusResult(
@@ -488,6 +489,11 @@ def _stop(arguments: NoArguments, context: ToolContext) -> BrowserStatusResult:
             )
         time.sleep(0.1)
     raise RuntimeError("Wyzer could not confirm that the managed browser stopped.")
+
+
+def _stop(arguments: NoArguments, context: ToolContext) -> BrowserStatusResult:
+    del arguments, context
+    return stop_managed_browser()
 
 
 def _status(arguments: NoArguments, context: ToolContext) -> BrowserStatusResult:

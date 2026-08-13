@@ -35,7 +35,7 @@ Install Wyzer
 
 Using Wyzer
 -----------
-- Double-click the desktop shortcut to open the character.
+- Double-click the desktop shortcut, then approve the Windows UAC prompt, to open Wyzer as administrator.
 - Double-click the character to open chat.
 - Right-click the character for controls, including Quit.
 - The first speech start may take a short time while models warm up.

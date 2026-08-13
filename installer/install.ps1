@@ -39,6 +39,16 @@ function Copy-NewFiles([string]$Source, [string]$Destination) {
     }
 }
 
+function Set-ShortcutRunAsAdministrator([string]$ShortcutPath) {
+    $shortcutBytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
+    if ($shortcutBytes.Length -le 0x15) {
+        throw "The desktop shortcut could not be marked to run as administrator."
+    }
+    # Set the Shell Link SLDF_RUNAS_USER flag (0x00002000) in LinkFlags.
+    $shortcutBytes[0x15] = [byte]($shortcutBytes[0x15] -bor 0x20)
+    [System.IO.File]::WriteAllBytes($ShortcutPath, $shortcutBytes)
+}
+
 function Test-NvidiaGpu {
     $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
     if ($null -eq $nvidiaSmi) { return $false }
@@ -158,12 +168,15 @@ pause
 if (-not $NoShortcut) {
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "Wyzer.lnk"
+    $wscriptPath = Join-Path $env:WINDIR "System32\wscript.exe"
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $hiddenLauncherPath
+    $shortcut.TargetPath = $wscriptPath
+    $shortcut.Arguments = "`"$hiddenLauncherPath`""
     $shortcut.WorkingDirectory = $InstallRoot
-    $shortcut.Description = "Start Wyzer"
+    $shortcut.Description = "Start Wyzer as administrator"
     $shortcut.Save()
+    Set-ShortcutRunAsAdministrator $shortcutPath
 }
 
 $env:WYZER_HOME = $InstallRoot

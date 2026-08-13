@@ -120,10 +120,10 @@
     "forbidden_tools": ["browser_stop", "browser_close_tab"]
   },
   {
-    "case_id": "clarify_ambiguous_chrome_close",
+    "case_id": "close_unqualified_chrome",
     "prompt": "Close Chrome.",
-    "expected_tools": [],
-    "forbidden_tools": ["browser_stop", "control_named_window", "browser_close_tab"]
+    "expected_tools": ["control_named_window"],
+    "forbidden_tools": ["browser_stop", "browser_close_tab"]
   },
   {
     "case_id": "inspect_web_page",

@@ -45,7 +45,7 @@ def test_end_to_end_cases_are_valid_and_cover_required_categories() -> None:
         "simple_open_volume_e2e",
         "simple_open_move_e2e",
         "personal_chrome_close_e2e",
-        "ambiguous_chrome_close_e2e",
+        "unqualified_chrome_close_e2e",
         "search_known_file_e2e",
         "read_known_file_e2e",
         "delete_known_file_e2e",
@@ -136,20 +136,21 @@ def test_delete_requires_registered_confirmation_boundary(
     assert report.results[0].executed_calls[-1].confirmation_required is True
 
 
-def test_ambiguous_chrome_clarification_counts_as_correct(
+def test_unqualified_chrome_close_executes_without_confirmation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     report = _evaluate(
         monkeypatch,
-        _case("ambiguous_chrome_close_e2e"),
+        _case("unqualified_chrome_close_e2e"),
         FakeChatProvider(
-            [text_response("Do you mean your personal Chrome window or Wyzer's managed browser?")]
+            [tool_response(("control_named_window", {"window": "Chrome", "action": "close"}))]
         ),
     )
 
     assert report.results[0].passed is True
-    assert report.results[0].satisfied_outcome == "clarification_requested"
-    assert report.results[0].tool_calls == 0
+    assert report.results[0].satisfied_outcome == "unqualified_chrome_closed"
+    assert report.results[0].confirmation_boundaries == []
+    assert report.results[0].tool_calls == 1
 
 
 def test_complex_plan_requires_meaningful_distinct_steps(

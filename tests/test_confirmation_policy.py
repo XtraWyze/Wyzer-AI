@@ -110,12 +110,5 @@ def test_routine_desktop_actions_do_not_require_confirmation() -> None:
         policy.requires_confirmation(
             close, {"window": "Google Chrome", "action": "close", "all_matches": False}
         )
-        is True
+        is False
     )
-    pending = policy.issue(
-        uuid4(),
-        uuid4(),
-        "control_named_window",
-        {"window": "Google Chrome", "action": "close", "all_matches": False},
-    )
-    assert "personal Chrome" in pending.prompt
