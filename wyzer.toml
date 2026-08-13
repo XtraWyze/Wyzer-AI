@@ -33,6 +33,7 @@ temperature = 0.1
 think = false
 max_output_tokens = 256
 detailed_output_tokens = 1024
+context_length = 32768
 request_timeout_seconds = 60
 auto_start = true
 startup_timeout_seconds = 10

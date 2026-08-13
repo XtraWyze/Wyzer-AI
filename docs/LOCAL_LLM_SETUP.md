@@ -18,6 +18,7 @@ provider = "ollama"
 model = "qwen3:8b"
 endpoint = "http://127.0.0.1:11434"
 temperature = 0.1
+context_length = 32768
 request_timeout_seconds = 60
 auto_start = true
 startup_timeout_seconds = 10
@@ -34,6 +35,8 @@ visual_click_min_confidence = 0.70
 Wyzer calls `POST /api/chat` with `stream=false`, a top-level `tools` array, and ordinary
 system/user/assistant/tool messages. Tool selection does not use `format` or a structured plan.
 `think` stays disabled by default for quick commands. `keep_alive` keeps the model loaded.
+`context_length` defaults to 32768 tokens and is sent as Ollama's `num_ctx` on chat, vision, and
+warm-up requests. When Wyzer auto-starts Ollama, it also sets `OLLAMA_CONTEXT_LENGTH` to this value.
 
 The `tools` array is a registry-backed capability view rather than the entire installed surface.
 Routine app, window, audio, media, and system commands are present immediately. For browser, file,

@@ -70,6 +70,7 @@ class OllamaVisionClient:
         temperature: float = 0.0,
         think: bool = False,
         keep_alive: str = "30m",
+        context_length: int = 32_768,
         enabled: bool = True,
     ) -> None:
         self.endpoint = endpoint.rstrip("/")
@@ -78,6 +79,7 @@ class OllamaVisionClient:
         self.temperature = temperature
         self.think = think
         self.keep_alive = keep_alive
+        self.context_length = context_length
         self.available = bool(enabled and self.endpoint and self.model)
         self.unavailable_reason = (
             None if self.available else "vision requires an enabled Ollama model"
@@ -120,7 +122,10 @@ class OllamaVisionClient:
             "format": response_schema,
             "stream": False,
             "think": self.think,
-            "options": {"temperature": self.temperature},
+            "options": {
+                "temperature": self.temperature,
+                "num_ctx": self.context_length,
+            },
             "keep_alive": self.keep_alive,
         }
         request = Request(

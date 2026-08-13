@@ -34,6 +34,7 @@ def create_chat_provider(
             endpoint,
             settings.model,
             **common,
+            context_length=settings.context_length,
             auto_start=settings.auto_start,
             startup_timeout_seconds=settings.startup_timeout_seconds,
             keep_alive=settings.keep_alive,

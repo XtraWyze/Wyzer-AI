@@ -23,6 +23,7 @@ class LLMSettings(StrictSettings):
     think: bool = False
     max_output_tokens: int = Field(default=256, ge=32, le=4_096)
     detailed_output_tokens: int = Field(default=1_024, ge=64, le=4_096)
+    context_length: int = Field(default=32_768, ge=2_048, le=262_144)
     request_timeout_seconds: float = Field(default=60, gt=0, le=600)
     api_key: SecretStr | None = None
     auto_start: bool = True
@@ -149,6 +150,7 @@ class WyzerSettings(StrictSettings):
             "WYZER_LLM_THINK": (("llm", "think"), _parse_bool),
             "WYZER_LLM_MAX_OUTPUT_TOKENS": (("llm", "max_output_tokens"), int),
             "WYZER_LLM_DETAILED_OUTPUT_TOKENS": (("llm", "detailed_output_tokens"), int),
+            "WYZER_LLM_CONTEXT_LENGTH": (("llm", "context_length"), int),
             "WYZER_MAX_TOOL_ROUNDS": (("maximum_tool_rounds",), int),
             "WYZER_CONFIRMATION_TTL_SECONDS": (("confirmation_ttl_seconds",), float),
             "WYZER_TOOL_RESULT_CONTEXT_CHARACTERS": (

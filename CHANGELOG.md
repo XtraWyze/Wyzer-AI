@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.3] - 2026-08-13
+
+### Changed
+
+- Default Ollama text, tool, warm-up, and screen-perception requests to a configurable 32,768-token
+  context window instead of relying on Ollama's smaller VRAM-based default.
+- Apply the configured context length when Wyzer auto-starts the local Ollama server, while also
+  sending `num_ctx` per request so the setting works with an already-running server.
+
 ## [0.2.2] - 2026-08-12
 
 ### Added

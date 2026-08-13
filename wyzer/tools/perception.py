@@ -562,6 +562,7 @@ class PerceptionToolPack:
                 temperature=float(str(self.options.get("temperature", 0.0))),
                 think=bool(self.options.get("think", False)),
                 keep_alive=str(self.options.get("keep_alive", "30m")),
+                context_length=int(str(self.options.get("context_length", 32_768))),
                 enabled=enabled,
             )
         pointer = self.pointer or WindowsPointerController()
