@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.8] - 2026-08-13
+
+### Fixed
+
+- Make Windows setup verify the bundled custom wake models, force-copy them into both the standard
+  and configured model directories, and confirm the installed files before the readiness check.
+- Save every final installation diagnostic to `install-readiness.json` so a failed fresh install
+  reports an actionable persistent path instead of referring only to console output.
+
 ## [0.2.7] - 2026-08-13
 
 ### Fixed
