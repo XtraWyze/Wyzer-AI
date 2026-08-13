@@ -123,6 +123,16 @@ class ConfirmationPolicy:
             return f"This will move {target} to the Recycle Bin. Should I continue?"
         if tool_name == "write_text_file" and arguments.get("overwrite") is True:
             return f"This will replace the existing text file {target}. Should I continue?"
+        if tool_name == "deep_scan_file_index":
+            content_note = (
+                " and read bounded text content"
+                if arguments.get("include_content", True)
+                else ""
+            )
+            return (
+                "A deep file scan will check every local drive"
+                f"{content_note} and may take several minutes. Should I continue?"
+            )
         if "send" in target.casefold() or tool_name.startswith("send_"):
             return f"This will send {target}. Should I continue?"
         if arguments.get("action") == "set_value" and _CREDENTIAL.search(target):

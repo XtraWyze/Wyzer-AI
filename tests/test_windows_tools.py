@@ -63,6 +63,7 @@ def test_default_registry_contains_all_builtin_tools() -> None:
         "open_indexed_folder",
         "read_text_file",
         "refresh_file_index",
+        "deep_scan_file_index",
         "browser_start",
         "browser_stop",
         "browser_status",
@@ -929,6 +930,7 @@ def test_native_tool_views_scope_optional_packs_and_hide_internal_tools() -> Non
     assert "is_process_running" in visible
     assert "refresh_application_index" not in visible
     assert "refresh_file_index" in files_visible
+    assert "deep_scan_file_index" in files_visible
     file_activation = next(
         tool.function for tool in registry.native_tools()
         if tool.function.name == "activate_file_tools"
@@ -941,6 +943,7 @@ def test_native_tool_views_scope_optional_packs_and_hide_internal_tools() -> Non
     assert registry.get("inspect_desktop_ui", require_available=False).llm_visible is False
     assert registry.get("click_desktop_element", require_available=False).llm_visible is False
     assert registry.get("refresh_file_index", require_available=False).llm_visible is True
+    assert registry.get("deep_scan_file_index").definition().confirmation.value == "always"
 
 
 def test_model_visible_action_schemas_use_enums_and_flat_monitor_destination() -> None:

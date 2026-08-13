@@ -137,10 +137,15 @@ The built-in `files` pack provides discovery plus direct file management:
 - `rename_path`
 - `delete_path` — sends the target to the Windows Recycle Bin and always requires confirmation
 - `open_indexed_folder`
+- `refresh_file_index` - a quick, bounded metadata-only scan of common user folders
+- `deep_scan_file_index` - a full local-drive scan with optional bounded text indexing
 
-`refresh_file_index` is model-visible after the `files` capability is activated. Wyzer's primary
-LLM decides when to call it from the user's request and receives the typed refresh result; there is
-no deterministic phrase router for file-index maintenance.
+Wyzer runs the same quick scan in the background at startup. It checks at most 20,000 files for up
+to five seconds and does not read file contents, so the UI and voice/model initialization remain
+responsive. Both maintenance tools are model-visible after the `files` capability is activated.
+The deep scan checks every local drive, can take several minutes, and always presents a dedicated
+confirmation before it starts. Incomplete or erroring scans update observed files without deleting
+unvisited catalog entries.
 
 Copy, move, and rename never overwrite an existing destination implicitly. Destructive changes to
 drive roots and protected Windows/program directories are rejected. File management results are

@@ -28,6 +28,7 @@ py -3.11 -m pip wheel $sourceRoot --no-deps --no-build-isolation --wheel-dir $re
 if ($LASTEXITCODE -ne 0) { throw "Could not build the Wyzer wheel." }
 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install.ps1") -Destination $resolvedOutput -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "Install Wyzer.cmd") -Destination $resolvedOutput -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "constraints-windows-py311.txt") -Destination $resolvedOutput -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "RELEASE_README.txt") -Destination (Join-Path $resolvedOutput "README.txt") -Force
 Copy-Item -LiteralPath (Join-Path $sourceRoot "wyzer.toml") -Destination $resolvedOutput -Force

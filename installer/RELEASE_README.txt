@@ -28,8 +28,9 @@ Install Wyzer
 -------------
 1. Complete the Python, Ollama, and model setup above.
 2. Extract this ZIP to a normal folder such as Downloads.
-3. Right-click install.ps1 and choose "Run with PowerShell".
-   If Windows asks, allow the script to run.
+3. Double-click "Install Wyzer.cmd".
+   It permits this installer process to run without changing the PC's saved PowerShell policy.
+   If Windows asks, allow the installer to run.
 4. Wait for the install to finish. The first install can take several minutes.
 5. Use the new "Wyzer" desktop shortcut.
 
@@ -59,6 +60,8 @@ Wyzer preserves those files.
 
 Important
 ---------
+- An organization-enforced PowerShell, AppLocker, or application-control policy still requires
+  approval from the computer administrator.
 - Wyzer does not change the computer's global Python packages.
 - On computers with an NVIDIA GPU, the installer adds CUDA-enabled PyTorch to Wyzer's private environment.
 - Do not delete the %LOCALAPPDATA%\Wyzer folder unless you want to remove Wyzer's

@@ -161,6 +161,9 @@ Build the transferable ZIP on the working Wyzer PC:
 powershell -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 ```
 
-Copy `dist\Wyzer-Setup.zip` to the destination PC, extract it, and run `install.ps1`. Installed
+Copy `dist\Wyzer-Setup.zip` to the destination PC, extract it, and double-click
+`Install Wyzer.cmd`. Its execution-policy bypass applies only to the installer process and does
+not change the PC's saved policy. Organization-enforced application controls still require an
+administrator. Installed
 configuration, avatars, models, memory, and task state live under `%LOCALAPPDATA%\Wyzer` and are
 preserved by later reinstalls. See [the installer guide](installer/README.md) for details.

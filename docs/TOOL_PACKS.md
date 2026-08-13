@@ -16,14 +16,14 @@ The default registry contains twelve focused packs:
 - `clipboard`: clipboard read/write plus focused-window copy and paste.
 - `desktop_interaction`: inspect and interact with controls in the focused Windows desktop app.
 - `diagnostics`: bounded read-only Windows telemetry and health diagnostics.
-- `files`: indexed file search, bounded text reads, model-driven refresh, file management, and
-  opening indexed folders.
+- `files`: indexed file search, bounded text reads, quick startup refresh, confirmed deep scans,
+  file management, and opening indexed folders.
 - `media`: Windows play/pause, next, previous, stop, and current-media inspection.
 - `perception`: local vision screen inspection and confidence-gated visual target activation.
 - `system`: system profile, process inspection, and bounded waits.
 - `windows`: named-window control and physical monitor movement.
 
-The built-in registry contains 58 tools. Applications, audio, media, system, windows, and capability
+The built-in registry contains 68 tools. Applications, audio, media, system, windows, and capability
 coordination are in the default model view. Browser, clipboard, desktop interaction, diagnostics,
 files, and perception remain built in but are activated on demand by the primary LLM. Built-in packs
 do not need separate installation and must not be listed under `[tool_packs].enabled`.
