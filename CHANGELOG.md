@@ -2,6 +2,18 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.4] - 2026-08-13
+
+### Changed
+
+- Mark the installed Wyzer desktop shortcut to request administrator access through Windows UAC.
+
+### Fixed
+
+- Treat personal Chrome windows and Wyzer's managed browser as candidates for an unqualified Chrome
+  close: close the sole candidate immediately, or ask which labeled candidate to close when several
+  exist.
+
 ## [0.2.3] - 2026-08-13
 
 ### Changed

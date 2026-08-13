@@ -36,12 +36,6 @@ class ConfirmationPolicy:
             return False
         if definition.name == "write_text_file":
             return arguments.get("overwrite") is True
-        if (
-            definition.name == "control_named_window"
-            and arguments.get("action") == "close"
-            and "chrome" in str(arguments.get("window", "")).casefold()
-        ):
-            return True
         searchable = " ".join(
             str(arguments.get(key, ""))
             for key in (
@@ -106,15 +100,6 @@ class ConfirmationPolicy:
 
     @staticmethod
     def _prompt(tool_name: str, arguments: dict[str, Any]) -> str:
-        if (
-            tool_name == "control_named_window"
-            and arguments.get("action") == "close"
-            and "chrome" in str(arguments.get("window", "")).casefold()
-        ):
-            return (
-                "This will close your personal Chrome window, not Wyzer's managed browser. "
-                "Should I continue?"
-            )
         target = next(
             (
                 str(arguments[key])

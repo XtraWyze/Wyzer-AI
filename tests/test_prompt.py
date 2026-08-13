@@ -44,13 +44,13 @@ files: search/read and write/edit text files"""
     assert capability_context in prompt
 
 
-def test_system_prompt_distinguishes_managed_and_personal_chrome() -> None:
+def test_system_prompt_closes_unqualified_chrome_without_kind_confirmation() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 
-    assert "Personal Chrome" in prompt
-    assert "uses control_named_window" in prompt
-    assert "ask whether managed or personal" in prompt
-    assert "use no tool" in prompt
+    assert "unqualified request to close Chrome" in prompt
+    assert "personal Chrome windows and Wyzer's managed browser as candidates" in prompt
+    assert "closes the sole candidate" in prompt
+    assert "ask which returned title or managed browser to close" in prompt
 
 
 def test_system_prompt_avoids_generic_follow_up_offers() -> None:

@@ -79,7 +79,7 @@
     ],
     "maximum_model_rounds": 4,
     "clarification": "forbidden",
-    "confirmation": "required",
+    "confirmation": "none",
     "efficiency": {
       "ideal_first_tools": ["control_named_window"],
       "ideal_provider_rounds": 1,
@@ -105,22 +105,16 @@
     }
   },
   {
-    "case_id": "ambiguous_chrome_close_e2e",
+    "case_id": "unqualified_chrome_close_e2e",
     "requested_goal": "Close Chrome.",
     "allowed_tool_paths": [
-      [],
-      ["get_foreground_window"],
-      ["get_foreground_window", "control_named_window"]
+      ["control_named_window"]
     ],
     "prohibited_tools": ["browser_stop", "browser_close_tab", "task_plan_create"],
-    "required_final_outcome": "Ask which Chrome context is intended, or inspect state that proves the foreground window is personal Chrome and close that window.",
+    "required_final_outcome": "An unqualified Chrome close immediately closes the sole Chrome candidate, whether personal or Wyzer-managed, and only asks when several candidates exist.",
     "outcomes": [
       {
-        "name": "clarification_requested",
-        "clarification": true
-      },
-      {
-        "name": "foreground_personal_chrome_closed",
+        "name": "unqualified_chrome_closed",
         "required_tools": [
           {
             "tool": "control_named_window",
@@ -133,21 +127,15 @@
       }
     ],
     "maximum_model_rounds": 4,
-    "clarification": "allowed",
-    "confirmation": "required_if_action",
+    "clarification": "forbidden",
+    "confirmation": "none",
     "efficiency": {
-      "ideal_first_tools": [],
+      "ideal_first_tools": ["control_named_window"],
       "ideal_provider_rounds": 1,
-      "ideal_tool_calls": 0,
+      "ideal_tool_calls": 1,
       "unnecessary_observation_tools": ["get_foreground_window"]
     },
     "mock_results": {
-      "get_foreground_window": {
-        "application": "chrome.exe",
-        "title": "Google Chrome",
-        "managed_browser": false,
-        "resolution": "This is an ordinary personal Chrome window, not Wyzer's managed browser."
-      },
       "control_named_window": {
         "window": "Google Chrome",
         "action": "close",

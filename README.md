@@ -152,7 +152,8 @@ See [Desktop companion UI](docs/DESKTOP_UI.md) for the interaction and architect
 Wyzer includes a Windows bootstrap installer that requires 64-bit Python 3.11 and creates its own
 private virtual environment. It installs the tested speech/UI dependencies, copies the custom
 avatar and wake-word assets, downloads the configured Faster-Whisper model, and creates a desktop
-shortcut without changing the PC's global Python packages.
+shortcut that requests administrator access through Windows UAC without changing the PC's global
+Python packages.
 
 Build the transferable ZIP on the working Wyzer PC:
 

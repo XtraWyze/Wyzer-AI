@@ -720,7 +720,7 @@ def test_stubborn_calculator_close_terminates_only_its_exact_process() -> None:
     assert backend.windows == []
 
 
-def test_personal_chrome_close_excludes_managed_browser_window(
+def test_explicit_personal_chrome_close_excludes_managed_browser_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import wyzer.tools.browser as browser_module
@@ -746,7 +746,7 @@ def test_personal_chrome_close_excludes_managed_browser_window(
 
     result = execute(
         "control_named_window",
-        {"window": "Chrome", "action": "close"},
+        {"window": "Personal Chrome", "action": "close"},
         backend,
     )
 
@@ -754,6 +754,129 @@ def test_personal_chrome_close_excludes_managed_browser_window(
     assert result.data is not None
     assert result.data["window_handle"] == 201
     assert [window.handle for window in backend.windows] == [200]
+
+
+def test_unqualified_chrome_close_asks_between_personal_and_managed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import wyzer.tools.browser as browser_module
+
+    backend = FakeWindowsBackend()
+    backend.windows = [
+        WindowInfo(
+            handle=200,
+            title="Wyzer Search - Google Chrome",
+            process_id=20,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+        WindowInfo(
+            handle=201,
+            title="Gmail - Google Chrome",
+            process_id=21,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+    ]
+    monkeypatch.setattr(browser_module, "managed_browser_process_ids", lambda: {20})
+
+    result = execute(
+        "control_named_window",
+        {"window": "Chrome", "action": "close"},
+        backend,
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "AMBIGUOUS_WINDOW"
+    assert result.error.details["matches"] == [
+        "Wyzer managed browser — Wyzer Search - Google Chrome",
+        "Personal Chrome — Gmail - Google Chrome",
+    ]
+    assert [window.handle for window in backend.windows] == [200, 201]
+
+
+def test_unqualified_chrome_close_stops_unique_managed_browser(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import wyzer.tools.browser as browser_module
+
+    backend = FakeWindowsBackend()
+    backend.windows = [
+        WindowInfo(
+            handle=200,
+            title="Wyzer Search - Google Chrome",
+            process_id=20,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        )
+    ]
+    stopped: list[bool] = []
+    monkeypatch.setattr(browser_module, "managed_browser_process_ids", lambda: {20})
+
+    def stop_managed_browser() -> browser_module.BrowserStatusResult:
+        stopped.append(True)
+        backend.windows.clear()
+        return browser_module.BrowserStatusResult(
+            running=False,
+            endpoint="http://127.0.0.1:9222",
+            message="The managed browser was closed.",
+        )
+
+    monkeypatch.setattr(browser_module, "stop_managed_browser", stop_managed_browser)
+
+    result = execute(
+        "control_named_window",
+        {"window": "Chrome", "action": "close"},
+        backend,
+    )
+
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data["verified"] is True
+    assert stopped == [True]
+    assert backend.windows == []
+
+
+def test_multiple_personal_chrome_windows_require_disambiguation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import wyzer.tools.browser as browser_module
+
+    backend = FakeWindowsBackend()
+    backend.windows = [
+        WindowInfo(
+            handle=200,
+            title="Gmail - Google Chrome",
+            process_id=20,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+        WindowInfo(
+            handle=201,
+            title="YouTube - Google Chrome",
+            process_id=21,
+            application="chrome.exe",
+            monitor_id="monitor:1",
+        ),
+    ]
+    monkeypatch.setattr(browser_module, "managed_browser_process_ids", lambda: set())
+
+    result = execute(
+        "control_named_window",
+        {"window": "Chrome", "action": "close"},
+        backend,
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "AMBIGUOUS_WINDOW"
+    assert "Ask the user which Chrome candidate to close" in result.error.message
+    assert result.error.details["matches"] == [
+        "Personal Chrome — Gmail - Google Chrome",
+        "Personal Chrome — YouTube - Google Chrome",
+    ]
+    assert [window.handle for window in backend.windows] == [200, 201]
 
 
 def test_diagnose_system_is_read_only_and_returns_structured_telemetry() -> None:
