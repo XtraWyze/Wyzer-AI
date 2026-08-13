@@ -1253,9 +1253,9 @@ class GetMonitorLayoutTool(WindowsToolBase, Tool[NoArguments, MonitorsResult]):
 class ControlNamedWindowTool(WindowsToolBase, Tool[NamedWindowActionArguments, WindowActionResult]):
     name = "control_named_window"
     description = (
-        "Focus, minimize, maximize, restore, or close a desktop window. For close only, unqualified "
-        "Chrome includes personal windows and Wyzer's managed browser; one candidate closes directly "
-        "and multiple candidates are reported for choice."
+        "Control a desktop window: focus, minimize, maximize, restore, or close. For close, "
+        "unqualified Chrome includes personal and Wyzer-managed candidates; close one or report "
+        "multiple for choice; no preliminary window check is needed."
     )
     arguments_type = NamedWindowActionArguments
     result_type = WindowActionResult
