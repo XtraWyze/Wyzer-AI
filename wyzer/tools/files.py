@@ -69,7 +69,14 @@ class AppendTextFileArguments(ToolArguments):
 
 
 class RefreshFileIndexArguments(ToolArguments):
-    include_content: bool = True
+    pass
+
+
+class DeepScanFileIndexArguments(ToolArguments):
+    include_content: bool = Field(
+        default=True,
+        description="Also index bounded text content, which makes the scan take longer.",
+    )
 
 
 class ListDirectoryArguments(ToolArguments):
@@ -185,11 +192,13 @@ class TextMutationResult(BaseModel):
 
 
 class FileIndexResult(BaseModel):
+    scan_type: str
     files: int
     content_files: int
     skipped: int
     errors: int
     content_read: bool
+    complete: bool
 
 
 class DirectoryEntry(BaseModel):
@@ -1065,26 +1074,59 @@ class AppendTextFileTool(FileToolBase, Tool[AppendTextFileArguments, TextMutatio
 class RefreshFileIndexTool(FileToolBase, Tool[RefreshFileIndexArguments, FileIndexResult]):
     name = "refresh_file_index"
     description = (
-        "Refresh the local index of safe file metadata and text when the user asks to "
-        "refresh or rebuild it, or when indexed search is stale."
+        "Run a quick, bounded metadata-only refresh of common user folders. Use this for a "
+        "fast index update; use deep_scan_file_index only for a full rebuild."
     )
     arguments_type = RefreshFileIndexArguments
     result_type = FileIndexResult
-    risk_level = RiskLevel.MEDIUM
+    risk_level = RiskLevel.LOW
     read_only = False
-    default_timeout_seconds = 3600
+    default_timeout_seconds = 30
 
     def execute(
         self, arguments: RefreshFileIndexArguments, context: ToolContext
     ) -> FileIndexResult:
+        del arguments, context
+        stats = self.catalog.quick_refresh()
+        return FileIndexResult(
+            scan_type="quick",
+            files=stats.files,
+            content_files=stats.content_files,
+            skipped=stats.skipped,
+            errors=stats.errors,
+            content_read=False,
+            complete=stats.complete,
+        )
+
+
+class DeepScanFileIndexTool(
+    FileToolBase, Tool[DeepScanFileIndexArguments, FileIndexResult]
+):
+    name = "deep_scan_file_index"
+    description = (
+        "Rebuild the file index across all local drives. This can take several minutes and "
+        "must only run after the user confirms the dedicated deep scan."
+    )
+    arguments_type = DeepScanFileIndexArguments
+    result_type = FileIndexResult
+    risk_level = RiskLevel.MEDIUM
+    read_only = False
+    confirmation = ConfirmationMode.ALWAYS
+    default_timeout_seconds = 3600
+
+    def execute(
+        self, arguments: DeepScanFileIndexArguments, context: ToolContext
+    ) -> FileIndexResult:
         del context
         stats = self.catalog.refresh(include_content=arguments.include_content)
         return FileIndexResult(
+            scan_type="deep",
             files=stats.files,
             content_files=stats.content_files,
             skipped=stats.skipped,
             errors=stats.errors,
             content_read=arguments.include_content,
+            complete=stats.complete,
         )
 
 
@@ -1116,6 +1158,7 @@ class FileToolPack:
             RenamePathTool(self.catalog),
             DeletePathTool(self.catalog),
             RefreshFileIndexTool(self.catalog),
+            DeepScanFileIndexTool(self.catalog),
             OpenIndexedFolderTool(self.catalog, self.backend),
         )
 

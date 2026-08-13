@@ -112,3 +112,16 @@ def test_routine_desktop_actions_do_not_require_confirmation() -> None:
         )
         is False
     )
+
+
+def test_deep_file_scan_requires_confirmation_with_duration_warning() -> None:
+    registry = create_default_registry(FakeWindowsBackend())
+    definition = registry.get("deep_scan_file_index").definition()
+    policy = ConfirmationPolicy()
+
+    assert policy.requires_confirmation(definition, {"include_content": True}) is True
+    pending = policy.issue(
+        uuid4(), uuid4(), "deep_scan_file_index", {"include_content": True}
+    )
+    assert "every local drive" in pending.prompt
+    assert "several minutes" in pending.prompt

@@ -7,6 +7,9 @@ import difflib
 import os
 import queue
 import sqlite3
+import threading
+import time
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +34,18 @@ class IndexStats:
     content_files: int
     skipped: int
     errors: int
+    complete: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class _RootScanResult:
+    root: Path
+    stats: IndexStats
+    observed: set[str]
+
+
+_REFRESH_LOCKS: dict[str, threading.Lock] = {}
+_REFRESH_LOCKS_GUARD = threading.Lock()
 
 
 class FileCatalog:
@@ -109,60 +124,118 @@ class FileCatalog:
     def __init__(self, database: Path = Path(".wyzer/file_index.sqlite3")) -> None:
         self.database = database
         self.database.parent.mkdir(parents=True, exist_ok=True)
+        database_key = str(self.database.resolve()).casefold()
+        with _REFRESH_LOCKS_GUARD:
+            self._refresh_lock = _REFRESH_LOCKS.setdefault(database_key, threading.Lock())
         self._initialize()
 
-    def refresh(
-        self, roots: list[Path] | None = None, *, include_content: bool = True
+    def quick_refresh(
+        self,
+        roots: list[Path] | None = None,
+        *,
+        maximum_files: int = 20_000,
+        timeout_seconds: float = 5.0,
+        maximum_depth: int = 8,
+        environ: Mapping[str, str] | None = None,
     ) -> IndexStats:
-        roots = roots or self.drive_roots()
+        """Run a bounded metadata-only scan suitable for application startup.
+
+        An incomplete bounded scan updates everything it observes but deliberately
+        avoids pruning old rows. A later complete quick or deep scan can safely
+        remove entries that no longer exist.
+        """
+
+        selected_roots = roots if roots is not None else self.quick_roots(environ)
+        deadline = time.monotonic() + max(0.0, timeout_seconds)
+        return self.refresh(
+            selected_roots,
+            include_content=False,
+            maximum_files=max(1, maximum_files),
+            deadline=deadline,
+            maximum_depth=max(0, maximum_depth),
+        )
+
+    def refresh(
+        self,
+        roots: list[Path] | None = None,
+        *,
+        include_content: bool = True,
+        maximum_files: int | None = None,
+        deadline: float | None = None,
+        maximum_depth: int | None = None,
+    ) -> IndexStats:
+        roots = self.drive_roots() if roots is None else roots
         if not roots:
             return IndexStats(0, 0, 0, 0)
-        with self._connect() as connection:
-            existing = {
-                str(path).casefold(): (int(size), int(modified), bool(has_content))
-                for path, size, modified, has_content in connection.execute(
-                    "SELECT path,size,modified_ns,content IS NOT NULL FROM files"
-                )
-            }
-        batches: queue.Queue[list[ScanRecord] | None] = queue.Queue(maxsize=16)
-        seen: set[str] = set()
-        totals = IndexStats(0, 0, 0, 0)
-        workers = min(len(roots), max(1, (os.cpu_count() or 2) // 2), 4)
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [
-                pool.submit(self._scan_root, root, include_content, existing, batches)
-                for root in roots
-            ]
-            completed = 0
+        resolved_roots = list(dict.fromkeys(root.expanduser().resolve() for root in roots))
+        with self._refresh_lock:
             with self._connect() as connection:
-                while completed < len(futures):
-                    batch = batches.get()
-                    if batch is None:
-                        completed += 1
-                        continue
-                    connection.executemany(
-                        """
-                        INSERT INTO files(path,name,extension,size,modified_ns,content)
-                        VALUES(?,?,?,?,?,?)
-                        ON CONFLICT(path) DO UPDATE SET
-                          name=excluded.name, extension=excluded.extension,
-                          size=excluded.size, modified_ns=excluded.modified_ns,
-                          content=CASE WHEN ?=0 THEN files.content ELSE excluded.content END
-                        """,
-                        batch,
+                existing = {
+                    str(path).casefold(): (int(size), int(modified), bool(has_content))
+                    for path, size, modified, has_content in connection.execute(
+                        "SELECT path,size,modified_ns,content IS NOT NULL FROM files"
                     )
-                for future in futures:
-                    stats, observed = future.result()
-                    totals = IndexStats(
-                        totals.files + stats.files,
-                        totals.content_files + stats.content_files,
-                        totals.skipped + stats.skipped,
-                        totals.errors + stats.errors,
+                }
+            batches: queue.Queue[list[ScanRecord] | None] = queue.Queue(maxsize=16)
+            totals = IndexStats(0, 0, 0, 0)
+            workers = min(len(resolved_roots), max(1, (os.cpu_count() or 2) // 2), 4)
+            per_root_limit = (
+                max(1, maximum_files // len(resolved_roots))
+                if maximum_files is not None
+                else None
+            )
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [
+                    pool.submit(
+                        self._scan_root,
+                        root,
+                        include_content,
+                        existing,
+                        batches,
+                        maximum_files=per_root_limit,
+                        deadline=deadline,
+                        maximum_depth=maximum_depth,
                     )
-                    seen.update(observed)
-                stale = [(path,) for path in existing if path not in seen]
-                connection.executemany("DELETE FROM files WHERE path=?", stale)
-        return totals
+                    for root in resolved_roots
+                ]
+                completed = 0
+                with self._connect() as connection:
+                    while completed < len(futures):
+                        batch = batches.get()
+                        if batch is None:
+                            completed += 1
+                            continue
+                        connection.executemany(
+                            """
+                            INSERT INTO files(path,name,extension,size,modified_ns,content)
+                            VALUES(?,?,?,?,?,?)
+                            ON CONFLICT(path) DO UPDATE SET
+                              name=excluded.name, extension=excluded.extension,
+                              size=excluded.size, modified_ns=excluded.modified_ns,
+                              content=CASE WHEN ?=0 THEN files.content ELSE excluded.content END
+                            """,
+                            batch,
+                        )
+                    results = [future.result() for future in futures]
+                    observed = set().union(*(result.observed for result in results))
+                    complete_roots = [result.root for result in results if result.stats.complete]
+                    for result in results:
+                        stats = result.stats
+                        totals = IndexStats(
+                            totals.files + stats.files,
+                            totals.content_files + stats.content_files,
+                            totals.skipped + stats.skipped,
+                            totals.errors + stats.errors,
+                            totals.complete and stats.complete,
+                        )
+                    stale = [
+                        (path,)
+                        for path in existing
+                        if path not in observed
+                        and any(self._path_is_within(path, root) for root in complete_roots)
+                    ]
+                    connection.executemany("DELETE FROM files WHERE path=?", stale)
+            return totals
 
     def _scan_root(
         self,
@@ -170,14 +243,43 @@ class FileCatalog:
         include_content: bool,
         existing: dict[str, tuple[int, int, bool]],
         output: queue.Queue[list[ScanRecord] | None],
-    ) -> tuple[IndexStats, set[str]]:
+        *,
+        maximum_files: int | None,
+        deadline: float | None,
+        maximum_depth: int | None,
+    ) -> _RootScanResult:
         files = content_files = skipped = errors = 0
+        complete = True
         seen: set[str] = set()
         batch: list[ScanRecord] = []
+
+        def walk_error(_error: OSError) -> None:
+            nonlocal errors, complete
+            errors += 1
+            complete = False
+
         try:
-            for directory, names, filenames in os.walk(root, topdown=True):
+            if not root.is_dir():
+                return _RootScanResult(root, IndexStats(0, 0, 0, 1, False), seen)
+            for directory, names, filenames in os.walk(root, topdown=True, onerror=walk_error):
+                if deadline is not None and time.monotonic() >= deadline:
+                    complete = False
+                    break
+                depth = len(Path(directory).relative_to(root).parts)
+                if maximum_depth is not None and depth >= maximum_depth:
+                    if names:
+                        complete = False
+                    names.clear()
                 names[:] = [name for name in names if not self._excluded_directory(name)]
                 for filename in filenames:
+                    if maximum_files is not None and files >= maximum_files:
+                        complete = False
+                        names.clear()
+                        break
+                    if deadline is not None and time.monotonic() >= deadline:
+                        complete = False
+                        names.clear()
+                        break
                     path = Path(directory) / filename
                     if self._sensitive(path):
                         skipped += 1
@@ -218,11 +320,21 @@ class FileCatalog:
                         )
                     except (OSError, UnicodeError):
                         errors += 1
+                        complete = False
+                if not complete and (
+                    (maximum_files is not None and files >= maximum_files)
+                    or (deadline is not None and time.monotonic() >= deadline)
+                ):
+                    break
             if batch:
                 output.put(batch)
         finally:
             output.put(None)
-        return IndexStats(files, content_files, skipped, errors), seen
+        return _RootScanResult(
+            root,
+            IndexStats(files, content_files, skipped, errors, complete),
+            seen,
+        )
 
     def search(self, query: str, *, content: bool = True, limit: int = 20) -> list[FileMatch]:
         terms = [term for term in query.casefold().split() if term]
@@ -347,6 +459,29 @@ class FileCatalog:
             if int(ctypes.windll.kernel32.GetDriveTypeW(root)) in {2, 3}:
                 roots.append(Path(root))
         return roots
+
+    @staticmethod
+    def quick_roots(environ: Mapping[str, str] | None = None) -> list[Path]:
+        """Return high-value user folders without traversing entire drives."""
+
+        env = os.environ if environ is None else environ
+        homes = [env.get("USERPROFILE"), env.get("OneDrive"), env.get("OneDriveConsumer")]
+        candidates: list[Path] = []
+        for raw_home in homes:
+            if not raw_home:
+                continue
+            home = Path(raw_home).expanduser()
+            candidates.extend(
+                home / name
+                for name in ("Desktop", "Documents", "Downloads", "Pictures", "Videos", "Music")
+            )
+        return list(dict.fromkeys(path.resolve() for path in candidates if path.is_dir()))
+
+    @staticmethod
+    def _path_is_within(raw_path: str, root: Path) -> bool:
+        path = raw_path.replace("\\", "/").rstrip("/").casefold()
+        parent = str(root).replace("\\", "/").rstrip("/").casefold()
+        return path == parent or path.startswith(parent + "/")
 
     def _initialize(self) -> None:
         with self._connect() as connection:

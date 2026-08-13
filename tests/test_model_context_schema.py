@@ -38,6 +38,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "copy_selected_text",
     "create_directory",
     "delete_path",
+    "deep_scan_file_index",
     "diagnose_system",
     "edit_text_file",
     "get_current_media",
@@ -71,7 +72,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "write_clipboard",
     "write_text_file",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "a59b1dc606a56b38dd141657cea982e13e683515fc1112779947d187c2481f07"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "afa91845473b6dec471aa279644c373e924d8e5468f40702d2b3b5ae1661dd41"
 
 
 def _semantic_schema(value: Any) -> Any:

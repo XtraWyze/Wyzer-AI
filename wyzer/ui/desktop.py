@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from wyzer.app.orchestrator import Orchestrator
 from wyzer.brain import ChatProvider, diagnostic_provider
 from wyzer.config import WyzerSettings
+from wyzer.files import run_startup_quick_scan
 from wyzer.runtime_paths import data_home
 from wyzer.speech import (
     FasterWhisperRecognizer,
@@ -79,6 +80,7 @@ class AssistantRuntime(QObject):
         self._thread: threading.Thread | None = None
         self._voice_task: asyncio.Task[Any] | None = None
         self._startup_task: asyncio.Task[Any] | None = None
+        self._file_index_task: asyncio.Task[Any] | None = None
         self._manual_listen_lock = threading.Lock()
         self._speaker = create_speech_synthesizer(settings.speech)
         self._speaking = threading.Event()
@@ -109,6 +111,7 @@ class AssistantRuntime(QObject):
 
     async def _startup(self) -> None:
         self.assistant.world.set_operating_mode("voice" if self.voice_enabled else "text")
+        self._file_index_task = asyncio.create_task(self._quick_scan_file_index())
         diagnosable = diagnostic_provider(self.provider)
         if diagnosable is not None:
             try:
@@ -132,6 +135,17 @@ class AssistantRuntime(QObject):
             self.ready.emit("Speech model loaded and ready.")
             self._voice_task = asyncio.create_task(self._voice_loop())
         self.status_changed.emit("Idle")
+
+    async def _quick_scan_file_index(self) -> None:
+        try:
+            stats = await asyncio.to_thread(run_startup_quick_scan)
+        except Exception as exc:
+            self.ready.emit(f"Quick file-index scan could not finish: {exc}")
+            return
+        completeness = "complete" if stats.complete else "bounded"
+        self.ready.emit(
+            f"Quick file-index scan {completeness}: {stats.files:,} files checked."
+        )
 
     def submit(self, text: str, *, speak_reply: bool = False) -> None:
         if _STOP_COMMAND.fullmatch(text):

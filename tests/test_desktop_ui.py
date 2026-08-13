@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication
 
 from wyzer.brain import FakeChatProvider
 from wyzer.config import WyzerSettings
+from wyzer.files import IndexStats
 from wyzer.ui import desktop
 
 
@@ -75,6 +76,9 @@ def _wait_for(app: QApplication, predicate: Any, *, timeout_seconds: float = 2.0
 
 def _runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[desktop.AssistantRuntime, _Assistant]:
     monkeypatch.setattr(desktop, "create_speech_synthesizer", lambda settings: _Speaker())
+    monkeypatch.setattr(
+        desktop, "run_startup_quick_scan", lambda: IndexStats(3, 0, 0, 0)
+    )
     assistant = _Assistant()
     runtime = desktop.AssistantRuntime(
         assistant,
@@ -99,7 +103,10 @@ def test_desktop_runtime_serializes_rapid_submissions(
         _wait_for(qt_app, lambda: runtime._loop is not None)
         runtime.submit("one")
         runtime.submit("two")
-        _wait_for(qt_app, lambda: len(replies) == 2)
+        _wait_for(
+            qt_app,
+            lambda: len(replies) == 2 and bool(statuses) and statuses[-1] == "Idle",
+        )
 
         assert assistant.maximum_active == 1
         assert replies == ["Done: one", "Done: two"]

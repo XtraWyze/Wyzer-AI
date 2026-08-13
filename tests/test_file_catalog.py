@@ -19,6 +19,53 @@ def test_catalog_searches_metadata_and_safe_text_content(tmp_path: Path) -> None
     assert catalog.search("telescope calibration")[0].name == "project-notes.txt"
 
 
+def test_quick_refresh_is_bounded_and_does_not_read_content(tmp_path: Path) -> None:
+    root = tmp_path / "Documents"
+    root.mkdir()
+    document = root / "project-notes.txt"
+    document.write_text("The telescope calibration happens on Friday.", encoding="utf-8")
+    catalog = FileCatalog(tmp_path / "index.sqlite3")
+
+    stats = catalog.quick_refresh([root], timeout_seconds=5)
+
+    assert stats.complete is True
+    assert stats.content_files == 0
+    assert catalog.search("project notes", content=False)[0].path == str(document.resolve())
+    assert catalog.search("telescope calibration") == []
+
+
+def test_refresh_only_prunes_entries_below_completely_scanned_roots(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "one.txt").write_text("one", encoding="utf-8")
+    retained = second / "retain-me.txt"
+    retained.write_text("two", encoding="utf-8")
+    catalog = FileCatalog(tmp_path / "index.sqlite3")
+    catalog.refresh([first, second], include_content=False)
+
+    retained.unlink()
+    catalog.refresh([first], include_content=False)
+
+    assert catalog.search("retain-me", content=False)[0].path == str(retained.resolve())
+
+
+def test_incomplete_quick_refresh_preserves_unobserved_entries(tmp_path: Path) -> None:
+    root = tmp_path / "Documents"
+    root.mkdir()
+    stale = root / "keep-until-complete.txt"
+    stale.write_text("old", encoding="utf-8")
+    catalog = FileCatalog(tmp_path / "index.sqlite3")
+    catalog.refresh([root], include_content=False)
+    stale.unlink()
+
+    stats = catalog.quick_refresh([root], timeout_seconds=0)
+
+    assert stats.complete is False
+    assert catalog.search("keep-until-complete", content=False)
+
+
 def test_catalog_recovers_from_approximate_compound_project_query(tmp_path: Path) -> None:
     root = tmp_path / "drive"
     project = root / "PriusSolarController"

@@ -2,6 +2,18 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.6] - 2026-08-13
+
+### Fixed
+
+- Add a double-clickable installer launcher that uses a process-scoped PowerShell execution-policy
+  bypass, allowing installation when local script execution is disabled without changing the PC's
+  saved policy.
+- Add a bounded metadata-only startup scan of common user folders, and reserve full
+  local-drive/content indexing for a separately confirmed deep scan.
+- Preserve catalog entries outside the requested scan roots and avoid pruning unvisited entries
+  when a scan is interrupted, bounded, or encounters filesystem errors.
+
 ## [0.2.5] - 2026-08-13
 
 ### Fixed

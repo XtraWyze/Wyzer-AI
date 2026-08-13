@@ -16,6 +16,7 @@ from wyzer.app.orchestrator import Orchestrator
 from wyzer.brain import ChatProvider, create_chat_provider, diagnostic_provider
 from wyzer.config import WyzerSettings
 from wyzer.events import EventLedger
+from wyzer.files import run_startup_quick_scan
 from wyzer.memory import MemoryStore
 from wyzer.policy import ConfirmationPolicy
 from wyzer.runtime_paths import configure_runtime_paths, data_home, find_config_path
@@ -340,6 +341,7 @@ async def _start(
     wake_phrase: str | None = None,
 ) -> None:
     assistant.world.set_operating_mode("voice" if voice_enabled else "text")
+    quick_scan = asyncio.create_task(asyncio.to_thread(run_startup_quick_scan))
     diagnosable = diagnostic_provider(provider)
     if diagnosable is not None:
         diagnostic = await diagnosable.diagnose()
@@ -355,6 +357,16 @@ async def _start(
                 print(f"Local model ({diagnostic.provider}): loaded and ready.")
     elif settings.llm.provider == "none":
         print("Local model: disabled; local stop and memory commands remain available.")
+    try:
+        scan_stats = await quick_scan
+    except Exception as error:
+        print(f"File index: quick startup scan could not finish - {error}")
+    else:
+        completeness = "complete" if scan_stats.complete else "bounded"
+        print(
+            f"File index: quick startup scan {completeness} "
+            f"({scan_stats.files:,} files checked)."
+        )
     if voice_enabled:
         await voice_chat(
             assistant,
