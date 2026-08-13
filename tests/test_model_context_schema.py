@@ -60,6 +60,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "press_desktop_key",
     "read_clipboard",
     "read_text_file",
+    "refresh_file_index",
     "rename_path",
     "search_files",
     "search_installed_applications",
@@ -70,7 +71,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "write_clipboard",
     "write_text_file",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "e7604c7b406556b11a41ec790d0193c05a9be089148aee0554a80725babed795"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "a59b1dc606a56b38dd141657cea982e13e683515fc1112779947d187c2481f07"
 
 
 def _semantic_schema(value: Any) -> Any:

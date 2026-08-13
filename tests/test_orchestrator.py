@@ -8,6 +8,7 @@ from tests.fakes import (
     ConsequentialEchoTool,
     EchoTool,
     FailingTool,
+    FakeRefreshFileIndexTool,
     OpenApplicationTool,
     SlowEchoTool,
     VerifiedActionTool,
@@ -164,6 +165,60 @@ def test_specialized_capability_is_activated_by_model_for_next_native_round() ->
 
     asyncio.run(assistant.handle("Hello after that"))
     assert "echo" not in {tool.function.name for tool in provider.requests[3][1]}
+
+
+def test_file_index_refresh_is_selected_by_model_after_file_capability_activation() -> None:
+    registry = ToolRegistry()
+    registry.register_pack(
+        SimpleToolPack(
+            "capabilities",
+            (ListToolCapabilitiesTool, ActivateToolCapabilityTool),
+        )
+    )
+    registry.register_pack(
+        SimpleToolPack(
+            "files",
+            (FakeRefreshFileIndexTool,),
+            "Refresh local file knowledge.",
+            "file",
+        ),
+        default_visible=False,
+    )
+    registry.finalize_capability_activation_surface()
+    provider = FakeChatProvider(
+        [
+            tool_response(("activate_file_tools", {})),
+            tool_response(("refresh_file_index", {"include_content": True})),
+            text_response("The file index is refreshed."),
+        ]
+    )
+    assistant = build_assistant(registry, provider)
+
+    response = asyncio.run(assistant.handle("My file search is stale; rebuild its index"))
+
+    assert response.text == "The file index is refreshed."
+    assert len(provider.requests) == 3
+    assert "refresh_file_index" not in {
+        tool.function.name for tool in provider.requests[0][1]
+    }
+    activation = next(
+        tool.function
+        for tool in provider.requests[0][1]
+        if tool.function.name == "activate_file_tools"
+    )
+    assert "refresh" in activation.description.casefold()
+    assert "refresh_file_index" in {
+        tool.function.name for tool in provider.requests[1][1]
+    }
+    result = assistant.world.snapshot().recent_tool_calls[-1]
+    assert result.tool == "refresh_file_index"
+    assert result.data == {
+        "files": 530_746,
+        "content_files": 12_345,
+        "skipped": 7,
+        "errors": 0,
+        "content_read": True,
+    }
 
 
 def test_activation_cannot_expose_a_later_call_in_the_same_response() -> None:

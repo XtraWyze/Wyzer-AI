@@ -1063,9 +1063,11 @@ class AppendTextFileTool(FileToolBase, Tool[AppendTextFileArguments, TextMutatio
 
 
 class RefreshFileIndexTool(FileToolBase, Tool[RefreshFileIndexArguments, FileIndexResult]):
-    llm_visible = False
     name = "refresh_file_index"
-    description = "Refresh the local index of safe file metadata and text."
+    description = (
+        "Refresh the local index of safe file metadata and text when the user asks to "
+        "refresh or rebuild it, or when indexed search is stale."
+    )
     arguments_type = RefreshFileIndexArguments
     result_type = FileIndexResult
     risk_level = RiskLevel.MEDIUM
@@ -1091,8 +1093,8 @@ class FileToolPack:
 
     name = "files"
     description = (
-        "open named local folders/projects; search/read files; write/edit/append text; "
-        "list paths; create/copy/move/rename/delete files and folders."
+        "open named local folders/projects; search/read files; write/edit/append text; refresh the "
+        "file index; create/copy/move/rename/delete paths."
     )
     activation_name = "file"
 

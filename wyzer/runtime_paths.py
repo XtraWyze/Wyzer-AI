@@ -20,6 +20,24 @@ def data_home(environ: Mapping[str, str] | None = None) -> Path:
     return Path(configured).expanduser().resolve() if configured else (Path.cwd() / ".wyzer")
 
 
+def file_index_path(environ: Mapping[str, str] | None = None) -> Path:
+    """Return the stable file-catalog database path.
+
+    Early installed versions created the catalog below ``WYZER_HOME/.wyzer``
+    because :class:`FileCatalog` used a working-directory-relative default.
+    Keep using that populated legacy catalog when present, but put fresh
+    installed catalogs directly in ``WYZER_HOME``. Development already uses
+    ``<checkout>/.wyzer`` as its data home.
+    """
+    env = os.environ if environ is None else environ
+    home = data_home(env)
+    current = home / "file_index.sqlite3"
+    if not env.get("WYZER_HOME", "").strip():
+        return current
+    legacy = home / ".wyzer" / "file_index.sqlite3"
+    return legacy if not current.exists() and legacy.exists() else current
+
+
 def find_config_path(environ: Mapping[str, str] | None = None) -> Path | None:
     env = os.environ if environ is None else environ
     configured = env.get("WYZER_CONFIG", "").strip()
