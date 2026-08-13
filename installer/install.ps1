@@ -39,6 +39,47 @@ function Copy-NewFiles([string]$Source, [string]$Destination) {
     }
 }
 
+function Install-WakeWordModels(
+    [string]$Source,
+    [string[]]$Destinations
+) {
+    $expectedHashes = @{
+        "hey_Wyzer.onnx" = "DFCADF0902C52F230E59D671D4AD6FC86A3E7116FCF751BB4818334F54539700"
+        "hey_wiser.onnx" = "1B44C4161528E158CEF225DA38167120317CA093F5A1F5BA4C0BFB391EA08591"
+    }
+    if (-not (Test-Path -LiteralPath $Source)) {
+        throw "Bundled wake-word model directory is missing: $Source"
+    }
+    foreach ($name in $expectedHashes.Keys) {
+        $sourceModel = Join-Path $Source $name
+        if (-not (Test-Path -LiteralPath $sourceModel)) {
+            throw "Bundled wake-word model is missing: $name"
+        }
+        $sourceHash = (Get-FileHash -LiteralPath $sourceModel -Algorithm SHA256).Hash
+        if ($sourceHash -ne $expectedHashes[$name]) {
+            throw "Bundled wake-word model failed its SHA-256 check: $name"
+        }
+    }
+
+    foreach ($destination in @($Destinations | Where-Object { $_ } | Sort-Object -Unique)) {
+        New-Item -ItemType Directory -Force -Path $destination | Out-Null
+        foreach ($name in $expectedHashes.Keys) {
+            $sourceModel = Join-Path $Source $name
+            $target = Join-Path $destination $name
+            Copy-Item -LiteralPath $sourceModel -Destination $target -Force
+            $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+            if ($targetHash -ne $expectedHashes[$name]) {
+                throw "Installed wake-word model failed verification: $target"
+            }
+        }
+        $installedModels = @(Get-ChildItem -LiteralPath $destination -Filter "*.onnx" -File)
+        if ($installedModels.Count -eq 0) {
+            throw "No wake-word ONNX model was installed in $destination"
+        }
+        Write-Host "Wake-word models ready in $destination"
+    }
+}
+
 function Install-OpenWakeWordSupportModels(
     [string]$Source,
     [string]$PythonExecutable
@@ -121,6 +162,12 @@ if (-not (Test-Path -LiteralPath $constraints)) {
 if (-not (Test-Path -LiteralPath $packageSource)) {
     throw "Wyzer package source is missing: $packageSource"
 }
+if (-not (Test-Path -LiteralPath $wakeSource)) {
+    throw "Wake-word model assets are missing: $wakeSource"
+}
+if (@(Get-ChildItem -LiteralPath $wakeSource -Filter "*.onnx" -File).Count -eq 0) {
+    throw "The setup package contains no wake-word ONNX models: $wakeSource"
+}
 
 $python = Find-Python311
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
@@ -174,7 +221,18 @@ if (-not (Test-Path -LiteralPath $configTarget)) {
 }
 
 Copy-NewFiles $avatarSource (Join-Path $InstallRoot "avatar")
-Copy-NewFiles $wakeSource (Join-Path $InstallRoot "wake-models")
+
+$env:WYZER_HOME = $InstallRoot
+$env:WYZER_CONFIG = $configTarget
+$configuredWakeDirectoryOutput = & $venvPython -c "from wyzer.config import WyzerSettings; from wyzer.runtime_paths import configure_runtime_paths, find_config_path; p = find_config_path(); s = configure_runtime_paths(WyzerSettings.load(p), p); print(s.speech.wake_model_directory)" 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $configuredWakeDirectoryOutput) {
+    throw "Could not resolve the wake-word model directory from $configTarget"
+}
+$configuredWakeDirectory = [string]($configuredWakeDirectoryOutput | Select-Object -Last 1)
+Install-WakeWordModels $wakeSource @(
+    (Join-Path $InstallRoot "wake-models"),
+    $configuredWakeDirectory
+)
 
 $launcherPath = Join-Path $InstallRoot "Start Wyzer.cmd"
 $hiddenLauncherPath = Join-Path $InstallRoot "Start Wyzer.vbs"
@@ -216,8 +274,6 @@ if (-not $NoShortcut) {
     Set-ShortcutRunAsAdministrator $shortcutPath
 }
 
-$env:WYZER_HOME = $InstallRoot
-$env:WYZER_CONFIG = $configTarget
 Write-Host "Checking avatars, wake models, speech packages, and Whisper..."
 $checkArguments = @("-m", "wyzer.install_check")
 if ($SkipModelDownload) {
@@ -225,8 +281,12 @@ if ($SkipModelDownload) {
 } else {
     $checkArguments += "--download-model"
 }
+$readinessReport = Join-Path $InstallRoot "install-readiness.json"
+$checkArguments += @("--output", $readinessReport)
 & $venvPython @checkArguments
-if ($LASTEXITCODE -ne 0) { throw "Wyzer installed, but its readiness check failed. Review the report above." }
+if ($LASTEXITCODE -ne 0) {
+    throw "Wyzer installed, but its readiness check failed. The report was saved to $readinessReport"
+}
 
 Write-Host ""
 Write-Host "Wyzer is installed at $InstallRoot"

@@ -64,6 +64,13 @@ def test_missing_custom_avatar_does_not_fail_install_check(
         lambda: {"version": None, "cuda_available": False},
     )
 
-    install_check.main([])
+    report = tmp_path / "readiness.json"
+    install_check.main(["--output", str(report)])
 
     assert '"avatar_frames": 0' in capsys.readouterr().out
+    report_text = report.read_text(encoding="utf-8")
+    assert '"ok": true' in report_text
+    assert f'"wake_model_directory": "{tmp_path.as_posix()}"' in report_text.replace(
+        "\\\\", "/"
+    )
+    assert '"wake_model_files": [' in report_text

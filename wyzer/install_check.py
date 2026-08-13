@@ -116,6 +116,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Check whether Wyzer is ready to run")
     parser.add_argument("--download-model", action="store_true")
     parser.add_argument("--allow-missing-model", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
     path = find_config_path()
@@ -152,7 +153,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     if settings.speech.tts_device == "cuda" and not torch_details["cuda_available"]:
         failures.append("Text-to-speech is configured for CUDA, but PyTorch cannot use CUDA")
     if not wake_models:
-        failures.append("No wake-word ONNX model was installed")
+        failures.append(
+            "No wake-word ONNX model was installed in "
+            + str(settings.speech.wake_model_directory)
+        )
     if missing_wake_support and not args.allow_missing_model:
         failures.append(
             "OpenWakeWord support models are missing: " + ", ".join(missing_wake_support)
@@ -173,12 +177,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         "imports": imports,
         "avatar_frames": len(avatar_frames),
         "wake_models": len(wake_models),
+        "wake_model_directory": str(settings.speech.wake_model_directory),
+        "wake_model_files": sorted(path.name for path in wake_models),
         "openwakeword_support_models_ready": not missing_wake_support,
         "whisper_model_ready": whisper_ready,
         "torch": torch_details,
         "failures": failures,
     }
-    print(json.dumps(result, indent=2))
+    rendered = json.dumps(result, indent=2)
+    print(rendered)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered + "\n", encoding="utf-8")
     if failures:
         raise SystemExit(1)
 

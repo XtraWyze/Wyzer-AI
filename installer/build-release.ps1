@@ -19,6 +19,17 @@ $openWakeWordSupportModels = @(
     }
 )
 
+$wakeWordModels = @(
+    [PSCustomObject]@{
+        Name = "hey_Wyzer.onnx"
+        Sha256 = "DFCADF0902C52F230E59D671D4AD6FC86A3E7116FCF751BB4818334F54539700"
+    },
+    [PSCustomObject]@{
+        Name = "hey_wiser.onnx"
+        Sha256 = "1B44C4161528E158CEF225DA38167120317CA093F5A1F5BA4C0BFB391EA08591"
+    }
+)
+
 function Copy-OpenWakeWordSupportModels([string]$Destination) {
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     $installedRoot = & py -3.11 -c "from pathlib import Path; import openwakeword; print(Path(openwakeword.__file__).resolve().parent / 'resources' / 'models')" 2>$null
@@ -42,6 +53,29 @@ function Copy-OpenWakeWordSupportModels([string]$Destination) {
         if ($actualHash -ne $model.Sha256) {
             Remove-Item -LiteralPath $target -Force
             throw "OpenWakeWord support model $($model.Name) failed its SHA-256 check."
+        }
+    }
+}
+
+function Copy-WakeWordModels([string]$Source, [string]$Destination) {
+    if (-not (Test-Path -LiteralPath $Source)) {
+        throw "Wake-word model source is missing: $Source"
+    }
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    foreach ($model in $wakeWordModels) {
+        $sourceModel = Join-Path $Source $model.Name
+        if (-not (Test-Path -LiteralPath $sourceModel)) {
+            throw "Wake-word model source is missing $($model.Name)"
+        }
+        $sourceHash = (Get-FileHash -LiteralPath $sourceModel -Algorithm SHA256).Hash
+        if ($sourceHash -ne $model.Sha256) {
+            throw "Wake-word model $($model.Name) failed its source SHA-256 check."
+        }
+        $target = Join-Path $Destination $model.Name
+        Copy-Item -LiteralPath $sourceModel -Destination $target -Force
+        $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+        if ($targetHash -ne $model.Sha256) {
+            throw "Wake-word model $($model.Name) failed its release SHA-256 check."
         }
     }
 }
@@ -80,7 +114,9 @@ if (Test-Path -LiteralPath $avatarSource) {
 } else {
     Write-Warning "No custom avatar frames found. The installer will use Wyzer's built-in mascot."
 }
-Copy-Item -Path (Join-Path $sourceRoot "openwakemodels\*") -Destination (Join-Path $resolvedOutput "assets\wake-models") -Force
+Copy-WakeWordModels `
+    (Join-Path $sourceRoot "openwakemodels") `
+    (Join-Path $resolvedOutput "assets\wake-models")
 
 $zipPath = Join-Path (Split-Path -Parent $resolvedOutput) "Wyzer-Setup.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath }

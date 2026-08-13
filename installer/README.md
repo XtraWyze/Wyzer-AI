@@ -34,6 +34,9 @@ Kokoro TTS. Use `-TorchDevice cpu` to force the smaller CPU build or `-TorchDevi
 CUDA and fail installation if it cannot be initialized.
 
 Reinstalling preserves the installed `wyzer.toml`, avatar frames, models, memory, and task state.
+The installer verifies its bundled wake models, installs them into the directory selected by the
+preserved configuration, and writes the final diagnostic to
+`%LOCALAPPDATA%\Wyzer\install-readiness.json`.
 
 An organization-enforced PowerShell restriction, AppLocker rule, or application-control policy
 cannot and should not be bypassed by this launcher; an administrator must allow the installer.
