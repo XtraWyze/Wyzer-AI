@@ -138,8 +138,9 @@ The built-in `files` pack provides discovery plus direct file management:
 - `delete_path` — sends the target to the Windows Recycle Bin and always requires confirmation
 - `open_indexed_folder`
 
-`refresh_file_index` remains registered as an internal maintenance tool but is hidden from the
-normal model-visible file capability, matching the hidden application-index refresh behavior.
+`refresh_file_index` is model-visible after the `files` capability is activated. Wyzer's primary
+LLM decides when to call it from the user's request and receives the typed refresh result; there is
+no deterministic phrase router for file-index maintenance.
 
 Copy, move, and rename never overwrite an existing destination implicitly. Destructive changes to
 drive roots and protected Windows/program directories are rejected. File management results are

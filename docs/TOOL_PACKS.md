@@ -16,7 +16,8 @@ The default registry contains twelve focused packs:
 - `clipboard`: clipboard read/write plus focused-window copy and paste.
 - `desktop_interaction`: inspect and interact with controls in the focused Windows desktop app.
 - `diagnostics`: bounded read-only Windows telemetry and health diagnostics.
-- `files`: indexed file search, bounded text reads, refresh, and opening indexed folders.
+- `files`: indexed file search, bounded text reads, model-driven refresh, file management, and
+  opening indexed folders.
 - `media`: Windows play/pause, next, previous, stop, and current-media inspection.
 - `perception`: local vision screen inspection and confidence-gated visual target activation.
 - `system`: system profile, process inspection, and bounded waits.

@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.5] - 2026-08-13
+
+### Fixed
+
+- Keep the local file catalog on a stable per-user path after launching Wyzer through the elevated
+  Windows shortcut, while preserving indexes created by earlier installed versions.
+- Expose file-index refresh through the model-activated `files` capability so the primary LLM can
+  select and execute maintenance from natural-language requests.
+
 ## [0.2.4] - 2026-08-13
 
 ### Changed

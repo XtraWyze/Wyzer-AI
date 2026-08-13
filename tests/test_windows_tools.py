@@ -928,14 +928,19 @@ def test_native_tool_views_scope_optional_packs_and_hide_internal_tools() -> Non
     assert "list_running_processes" not in visible
     assert "is_process_running" in visible
     assert "refresh_application_index" not in visible
-    assert "refresh_file_index" not in files_visible
+    assert "refresh_file_index" in files_visible
+    file_activation = next(
+        tool.function for tool in registry.native_tools()
+        if tool.function.name == "activate_file_tools"
+    )
+    assert "refresh" in file_activation.description.casefold()
     assert "list_installed_applications" not in visible
     assert "wait_ms" not in visible
     assert "inspect_desktop_ui" not in visible
     assert "click_desktop_element" not in visible
     assert registry.get("inspect_desktop_ui", require_available=False).llm_visible is False
     assert registry.get("click_desktop_element", require_available=False).llm_visible is False
-    assert registry.get("refresh_file_index", require_available=False).llm_visible is False
+    assert registry.get("refresh_file_index", require_available=False).llm_visible is True
 
 
 def test_model_visible_action_schemas_use_enums_and_flat_monitor_destination() -> None:

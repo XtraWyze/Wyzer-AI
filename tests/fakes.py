@@ -103,6 +103,39 @@ class ConsequentialEchoTool(EchoTool):
     confirmation = ConfirmationMode.ALWAYS
 
 
+class RefreshFileIndexArguments(ToolArguments):
+    include_content: bool = True
+
+
+class RefreshFileIndexData(BaseModel):
+    files: int
+    content_files: int
+    skipped: int
+    errors: int
+    content_read: bool
+
+
+class FakeRefreshFileIndexTool(Tool[RefreshFileIndexArguments, RefreshFileIndexData]):
+    name = "refresh_file_index"
+    description = "Refresh a deterministic test file index."
+    arguments_type = RefreshFileIndexArguments
+    result_type = RefreshFileIndexData
+    risk_level = RiskLevel.MEDIUM
+    read_only = False
+
+    def execute(
+        self, arguments: RefreshFileIndexArguments, context: ToolContext
+    ) -> RefreshFileIndexData:
+        del context
+        return RefreshFileIndexData(
+            files=530_746,
+            content_files=12_345,
+            skipped=7,
+            errors=0,
+            content_read=arguments.include_content,
+        )
+
+
 def text_response(text: str) -> ProviderChatResponse:
     return ProviderChatResponse(message=ChatMessage(role="assistant", content=text))
 

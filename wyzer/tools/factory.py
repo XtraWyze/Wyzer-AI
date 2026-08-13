@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from wyzer.desktop.system import WindowsSystemBackend
 from wyzer.desktop.windows_backend import CtypesWindowsBackend
 from wyzer.files import FileCatalog
+from wyzer.runtime_paths import file_index_path
 from wyzer.tools.builtin_packs import DEFAULT_CAPABILITY_PACKS, create_builtin_packs
 from wyzer.tools.discovery import load_enabled_tool_packs
 from wyzer.tools.files import FileToolPack
@@ -33,7 +34,9 @@ def create_default_registry(
     registry = ToolRegistry()
     for pack in create_builtin_packs(backend, perception_options):
         registry.register_pack(pack, default_visible=pack.name in DEFAULT_CAPABILITY_PACKS)
-    registry.register_pack(FileToolPack(FileCatalog(), backend), default_visible=False)
+    registry.register_pack(
+        FileToolPack(FileCatalog(file_index_path()), backend), default_visible=False
+    )
     for pack_factory in extra_pack_factories:
         registry.register_pack(pack_factory(), default_visible=False)
     for pack in load_enabled_tool_packs(tuple(enabled_entrypoint_packs)):
