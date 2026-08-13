@@ -2,6 +2,13 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.7] - 2026-08-13
+
+### Fixed
+
+- Bundle and verify OpenWakeWord's required ONNX preprocessing models in the Windows setup ZIP so
+  a fresh install does not depend on a separate GitHub model download.
+
 ## [0.2.6] - 2026-08-13
 
 ### Fixed

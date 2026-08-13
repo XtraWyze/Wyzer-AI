@@ -39,6 +39,39 @@ function Copy-NewFiles([string]$Source, [string]$Destination) {
     }
 }
 
+function Install-OpenWakeWordSupportModels(
+    [string]$Source,
+    [string]$PythonExecutable
+) {
+    if (-not (Test-Path -LiteralPath $Source)) { return }
+    $expectedHashes = @{
+        "melspectrogram.onnx" = "BA2B0E0F8B7B875369A2C89CB13360FF53BAC436F2895CCED9F479FA65EB176F"
+        "embedding_model.onnx" = "70D164290C1D095D1D4EE149BC5E00543250A7316B59F31D056CFF7BD3075C1F"
+    }
+    $installedRoot = & $PythonExecutable -c "from pathlib import Path; import openwakeword; print(Path(openwakeword.__file__).resolve().parent / 'resources' / 'models')" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $installedRoot) {
+        throw "Could not locate OpenWakeWord's installed support-model directory."
+    }
+    $destination = [string]($installedRoot | Select-Object -Last 1)
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    foreach ($name in $expectedHashes.Keys) {
+        $sourceModel = Join-Path $Source $name
+        if (-not (Test-Path -LiteralPath $sourceModel)) {
+            throw "Bundled OpenWakeWord support model is missing: $name"
+        }
+        $sourceHash = (Get-FileHash -LiteralPath $sourceModel -Algorithm SHA256).Hash
+        if ($sourceHash -ne $expectedHashes[$name]) {
+            throw "Bundled OpenWakeWord support model failed its SHA-256 check: $name"
+        }
+        $target = Join-Path $destination $name
+        Copy-Item -LiteralPath $sourceModel -Destination $target -Force
+        $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+        if ($targetHash -ne $expectedHashes[$name]) {
+            throw "Installed OpenWakeWord support model failed verification: $name"
+        }
+    }
+}
+
 function Set-ShortcutRunAsAdministrator([string]$ShortcutPath) {
     $shortcutBytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
     if ($shortcutBytes.Length -le 0x15) {
@@ -104,6 +137,10 @@ Write-Host "Installing the tested Wyzer dependency set..."
 if ($LASTEXITCODE -ne 0) { throw "Could not update the installer tools." }
 & $venvPython -m pip install --constraint $constraints "$packageSource[audio,ui]"
 if ($LASTEXITCODE -ne 0) { throw "Wyzer or one of its dependencies could not be installed." }
+
+Install-OpenWakeWordSupportModels `
+    (Join-Path $scriptDirectory "assets\openwakeword-support") `
+    $venvPython
 
 $cudaRequested = $TorchDevice -eq "cuda" -or ($TorchDevice -eq "auto" -and (Test-NvidiaGpu))
 if ($cudaRequested) {

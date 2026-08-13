@@ -22,11 +22,12 @@ To make a ZIP for another Windows PC:
 powershell -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 ```
 
-Copy `dist\Wyzer-Setup.zip` to the other PC, extract it, and double-click `Install Wyzer.cmd`. The release includes
-the current custom avatar frames and wake-word models. The installer downloads the configured
-Faster-Whisper model and OpenWakeWord's required preprocessing models. Pass `-SkipModelDownload`
-only when preparing an offline installation; voice recognition will not work until those models
-are installed.
+Copy `dist\Wyzer-Setup.zip` to the other PC, extract it, and double-click `Install Wyzer.cmd`. The
+release includes the current custom avatar frames, wake-word models, and pinned OpenWakeWord
+preprocessing models.
+The installer downloads the configured Faster-Whisper model. Pass `-SkipModelDownload` only when
+preparing an offline installation; voice recognition will not work until the Whisper model is
+installed.
 
 The installer automatically detects NVIDIA GPUs and installs the CUDA 12.1 PyTorch build used by
 Kokoro TTS. Use `-TorchDevice cpu` to force the smaller CPU build or `-TorchDevice cuda` to require
