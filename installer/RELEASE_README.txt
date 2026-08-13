@@ -62,6 +62,8 @@ Important
 ---------
 - An organization-enforced PowerShell, AppLocker, or application-control policy still requires
   approval from the computer administrator.
+- OpenWakeWord's required preprocessing models are bundled and verified by the installer; they do
+  not require a separate download on the destination PC.
 - Wyzer does not change the computer's global Python packages.
 - On computers with an NVIDIA GPU, the installer adds CUDA-enabled PyTorch to Wyzer's private environment.
 - Do not delete the %LOCALAPPDATA%\Wyzer folder unless you want to remove Wyzer's
