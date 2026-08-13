@@ -51,6 +51,7 @@ def build_assistant(settings: WyzerSettings, provider: ChatProvider | None = Non
             "temperature": 0.0,
             "think": False,
             "keep_alive": settings.llm.keep_alive,
+            "context_length": settings.llm.context_length,
         },
         enabled_entrypoint_packs=tuple(settings.tool_packs.enabled),
     )

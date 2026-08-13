@@ -120,6 +120,7 @@ def test_ollama_uses_native_tools_without_execution_plan_format() -> None:
     assert "format" not in payload
     assert payload["think"] is False
     assert payload["options"]["num_predict"] == 256
+    assert payload["options"]["num_ctx"] == 32768
     assert payload["stream"] is False
 
 
@@ -244,7 +245,27 @@ def test_ollama_warm_up_loads_model_without_generating_text() -> None:
         "prompt": "",
         "stream": False,
         "keep_alive": "45m",
+        "options": {"num_ctx": 32768},
     }
+
+
+def test_ollama_auto_start_sets_context_length_environment(monkeypatch: Any) -> None:
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr("wyzer.brain.providers.shutil.which", lambda _name: "ollama.exe")
+
+    def fake_popen(command: list[str], **kwargs: Any) -> object:
+        captured.update({"command": command, **kwargs})
+        return object()
+
+    monkeypatch.setattr("wyzer.brain.providers.subprocess.Popen", fake_popen)
+    provider = OllamaChatProvider(
+        "http://127.0.0.1:11434", "test", context_length=16384
+    )
+
+    assert provider._start_local_service() is True
+    assert captured["command"] == ["ollama.exe", "serve"]
+    assert captured["env"]["OLLAMA_CONTEXT_LENGTH"] == "16384"
 
 
 def test_openai_compatible_warm_up_forces_one_token_completion() -> None:

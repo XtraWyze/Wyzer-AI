@@ -13,6 +13,7 @@ def test_defaults_work_without_llm() -> None:
     assert settings.llm.think is False
     assert settings.llm.max_output_tokens == 256
     assert settings.llm.detailed_output_tokens == 1024
+    assert settings.llm.context_length == 32768
     assert settings.audio.default_master_volume_step == 10
     assert settings.tool_packs.enabled == []
     assert settings.task_engine.enabled is True
@@ -31,6 +32,7 @@ def test_environment_overrides_typed_values() -> None:
             "WYZER_TOOL_PACKS": "clipboard, home_assistant",
             "WYZER_LLM_MAX_OUTPUT_TOKENS": "128",
             "WYZER_LLM_DETAILED_OUTPUT_TOKENS": "512",
+            "WYZER_LLM_CONTEXT_LENGTH": "16384",
         }
     )
     assert settings.maximum_tool_rounds == 7
@@ -42,6 +44,7 @@ def test_environment_overrides_typed_values() -> None:
     assert settings.tool_packs.enabled == ["clipboard", "home_assistant"]
     assert settings.llm.max_output_tokens == 128
     assert settings.llm.detailed_output_tokens == 512
+    assert settings.llm.context_length == 16384
 
 
 def test_toml_and_environment_precedence(tmp_path: Path) -> None:

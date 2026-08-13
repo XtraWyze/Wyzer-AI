@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -133,12 +134,14 @@ class OllamaChatProvider(NativeChatProvider):
         auto_start: bool = False,
         startup_timeout_seconds: float = 10,
         keep_alive: str = "30m",
+        context_length: int = 32_768,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.auto_start = auto_start
         self.startup_timeout_seconds = startup_timeout_seconds
         self.keep_alive = keep_alive
+        self.context_length = context_length
         self._startup_lock = asyncio.Lock()
 
     async def _chat(
@@ -160,6 +163,7 @@ class OllamaChatProvider(NativeChatProvider):
             "options": {
                 "temperature": active.temperature,
                 "num_predict": active.max_output_tokens,
+                "num_ctx": self.context_length,
             },
             "keep_alive": self.keep_alive,
         }
@@ -217,6 +221,7 @@ class OllamaChatProvider(NativeChatProvider):
                 "prompt": "",
                 "stream": False,
                 "keep_alive": self.keep_alive,
+                "options": {"num_ctx": self.context_length},
             },
             timeout_seconds=self.timeout_seconds,
         )
@@ -246,14 +251,16 @@ class OllamaChatProvider(NativeChatProvider):
     def _is_local_endpoint(self) -> bool:
         return (urlparse(self.endpoint).hostname or "").casefold() in {"127.0.0.1", "localhost"}
 
-    @staticmethod
-    def _start_local_service() -> bool:
+    def _start_local_service(self) -> bool:
         executable = shutil.which("ollama")
         if executable is None:
             return False
+        environment = os.environ.copy()
+        environment["OLLAMA_CONTEXT_LENGTH"] = str(self.context_length)
         try:
             subprocess.Popen(
                 [executable, "serve"],
+                env=environment,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
