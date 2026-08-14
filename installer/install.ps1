@@ -102,6 +102,63 @@ function Save-TrustedDownload(
     Assert-TrustedInstaller $Destination $ExpectedPublishers
 }
 
+function Test-SupportedVisualCppVersion([string]$Version) {
+    try {
+        return [Version]($Version.TrimStart([char]"v")) -ge [Version]"14.20.0.0"
+    } catch {
+        return $false
+    }
+}
+
+function Test-VisualCppRuntime {
+    $registryPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+    )
+    foreach ($registryPath in $registryPaths) {
+        $runtime = Get-ItemProperty -LiteralPath $registryPath -ErrorAction SilentlyContinue
+        if ($null -ne $runtime -and $runtime.Installed -eq 1 -and `
+            (Test-SupportedVisualCppVersion ([string]$runtime.Version))) {
+            return $true
+        }
+    }
+    $systemDirectory = Join-Path $env:WINDIR "System32"
+    $runtimeFile = Get-Item -LiteralPath `
+        (Join-Path $systemDirectory "vcruntime140_1.dll") `
+        -ErrorAction SilentlyContinue
+    return $null -ne $runtimeFile -and `
+        (Test-SupportedVisualCppVersion ([string]$runtimeFile.VersionInfo.FileVersion))
+}
+
+function Install-VisualCppRuntime {
+    if (Test-VisualCppRuntime) {
+        Write-Host "Microsoft Visual C++ runtime is ready."
+        return
+    }
+
+    Write-InstallStep "Installing Microsoft's Windows runtime libraries"
+    $installer = Join-Path ([IO.Path]::GetTempPath()) "wyzer-vc-redist-x64.exe"
+    try {
+        Save-TrustedDownload `
+            "https://aka.ms/vc14/vc_redist.x64.exe" `
+            $installer `
+            @("Microsoft Corporation")
+        $process = Start-Process -FilePath $installer `
+            -ArgumentList "/install /quiet /norestart" -Wait -PassThru
+        if ($process.ExitCode -notin @(0, 1638, 3010)) {
+            throw "The Microsoft Visual C++ runtime installer returned exit code $($process.ExitCode)."
+        }
+        if ($process.ExitCode -eq 3010) {
+            Write-Warning "Windows requested a restart after installing its runtime libraries. Finish setup first, then restart before launching Wyzer if readiness fails."
+        }
+    } finally {
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-VisualCppRuntime)) {
+        throw "Microsoft Visual C++ runtime installation completed, but the x64 runtime is still unavailable."
+    }
+}
+
 function Install-PrivatePython311 {
     $target = Join-Path $InstallRoot "Python311"
     $installer = Join-Path ([IO.Path]::GetTempPath()) "wyzer-python-3.11.9-amd64.exe"
@@ -286,7 +343,7 @@ function Install-OpenWakeWordSupportModels(
         "melspectrogram.onnx" = "BA2B0E0F8B7B875369A2C89CB13360FF53BAC436F2895CCED9F479FA65EB176F"
         "embedding_model.onnx" = "70D164290C1D095D1D4EE149BC5E00543250A7316B59F31D056CFF7BD3075C1F"
     }
-    $installedRoot = & $PythonExecutable -c "from pathlib import Path; import openwakeword; print(Path(openwakeword.__file__).resolve().parent / 'resources' / 'models')" 2>$null
+    $installedRoot = & $PythonExecutable -c "from importlib.util import find_spec; from pathlib import Path; spec = find_spec('openwakeword'); assert spec is not None and spec.origin; print(Path(spec.origin).resolve().parent / 'resources' / 'models')" 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $installedRoot) {
         throw "Could not locate OpenWakeWord's installed support-model directory."
     }
@@ -372,6 +429,7 @@ if ($null -eq $python) {
 } else {
     Write-Host "Using compatible Python: $($python.Executable)"
 }
+Install-VisualCppRuntime
 $venv = Join-Path $InstallRoot ".venv"
 $venvPython = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $venvPython)) {

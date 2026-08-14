@@ -17,6 +17,10 @@ All notable changes to Wyzer are documented here.
 
 - Refresh the installer process PATH after installing Ollama and fall back from WinGet to Ollama's
   signed official installer when WinGet is unavailable.
+- Install Microsoft's signed Visual C++ x64 runtime when absent, satisfying ONNX Runtime's native
+  Windows dependency on a genuinely fresh PC.
+- Locate OpenWakeWord's bundled support-model directory without importing the entire speech stack
+  before its native prerequisites and model assets are ready.
 - Save a persistent installation transcript to `%LOCALAPPDATA%\Wyzer\install.log` and point failed
   double-click installs to it.
 - Keep the package and runtime version identifiers synchronized.

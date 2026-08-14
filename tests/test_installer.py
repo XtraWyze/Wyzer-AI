@@ -70,6 +70,26 @@ def test_fresh_windows_install_bootstraps_signed_python_and_ollama() -> None:
     assert "--disable-interactivity" in installer
 
 
+def test_fresh_windows_install_bootstraps_the_native_runtime() -> None:
+    installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
+
+    assert "Test-VisualCppRuntime" in installer
+    assert "Install-VisualCppRuntime" in installer
+    assert "https://aka.ms/vc14/vc_redist.x64.exe" in installer
+    assert "Microsoft Corporation" in installer
+    assert '"/install /quiet /norestart"' in installer
+    assert installer.index("Install-VisualCppRuntime\n") < installer.index(
+        '$venv = Join-Path $InstallRoot ".venv"'
+    )
+
+
+def test_openwakeword_model_locator_does_not_import_the_package() -> None:
+    installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
+
+    assert "find_spec('openwakeword')" in installer
+    assert "import openwakeword; print(Path(openwakeword.__file__)" not in installer
+
+
 def test_installer_pulls_the_model_from_the_effective_config_and_launches() -> None:
     installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
 
