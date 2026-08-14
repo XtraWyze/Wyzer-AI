@@ -11,6 +11,12 @@ def test_double_click_launcher_uses_process_scoped_execution_policy_bypass() -> 
     assert "Set-ExecutionPolicy" not in launcher
 
 
+def test_double_click_launcher_points_failures_to_the_install_log() -> None:
+    launcher = (INSTALLER_DIRECTORY / "Install Wyzer.cmd").read_text(encoding="utf-8")
+
+    assert r"%LOCALAPPDATA%\Wyzer\install.log" in launcher
+
+
 def test_release_builder_includes_double_click_launcher() -> None:
     builder = (INSTALLER_DIRECTORY / "build-release.ps1").read_text(encoding="utf-8")
 
@@ -29,8 +35,8 @@ def test_release_bundles_verified_openwakeword_support_models() -> None:
         assert name in installer
         assert sha256 in builder
         assert sha256 in installer
-    assert 'assets\\openwakeword-support' in builder
-    assert 'assets\\openwakeword-support' in installer
+    assert "assets\\openwakeword-support" in builder
+    assert "assets\\openwakeword-support" in installer
 
 
 def test_installer_copies_and_verifies_wake_models_to_configured_directory() -> None:
@@ -49,3 +55,34 @@ def test_installer_copies_and_verifies_wake_models_to_configured_directory() -> 
     assert "Install-WakeWordModels" in installer
     assert 'Get-ChildItem -LiteralPath $destination -Filter "*.onnx"' in installer
     assert '"--output", $readinessReport' in installer
+
+
+def test_fresh_windows_install_bootstraps_signed_python_and_ollama() -> None:
+    installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
+
+    assert "Install-PrivatePython311" in installer
+    assert "Python Software Foundation" in installer
+    assert "Get-AuthenticodeSignature" in installer
+    assert "Python311\\python.exe" in installer
+    assert "Ollama.Ollama" in installer
+    assert "https://ollama.com/download/OllamaSetup.exe" in installer
+    assert "--accept-package-agreements" in installer
+    assert "--disable-interactivity" in installer
+
+
+def test_installer_pulls_the_model_from_the_effective_config_and_launches() -> None:
+    installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
+
+    assert "Install-OllamaModel $ollama ([string]$llmDetails.model)" in installer
+    assert "& $Executable pull $Model" in installer
+    assert 'Join-Path ([Environment]::GetFolderPath("Programs")) "Wyzer"' in installer
+    assert "if (-not $NoLaunch)" in installer
+    assert 'Join-Path $InstallRoot "install.log"' in installer
+
+
+def test_release_guide_has_no_manual_python_or_ollama_prerequisite() -> None:
+    guide = (INSTALLER_DIRECTORY / "RELEASE_README.txt").read_text(encoding="utf-8")
+
+    assert "You do not need to open PowerShell" in guide
+    assert "winget install -e --id Python.Python.3.11" not in guide
+    assert "ollama pull qwen3.5:4b" not in guide

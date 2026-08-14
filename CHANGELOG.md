@@ -2,6 +2,25 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.11] - 2026-08-14
+
+### Changed
+
+- Turn Windows setup into a fresh-PC, one-double-click flow that installs a signed private Python
+  runtime when needed, Ollama, the configured local AI model, speech dependencies, and shortcuts.
+- Start Wyzer automatically after the final readiness check and add a Start Menu shortcut alongside
+  the Desktop shortcut.
+- Replace the manual Python, Ollama, and model prerequisites in the release guide with the automated
+  setup flow.
+
+### Fixed
+
+- Refresh the installer process PATH after installing Ollama and fall back from WinGet to Ollama's
+  signed official installer when WinGet is unavailable.
+- Save a persistent installation transcript to `%LOCALAPPDATA%\Wyzer\install.log` and point failed
+  double-click installs to it.
+- Keep the package and runtime version identifiers synchronized.
+
 ## [0.2.10] - 2026-08-14
 
 ### Fixed

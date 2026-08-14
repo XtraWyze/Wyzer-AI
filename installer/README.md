@@ -1,7 +1,9 @@
 # Wyzer Windows installer
 
-Wyzer's installer requires 64-bit Python 3.11. It creates a private virtual environment under
-`%LOCALAPPDATA%\Wyzer`; it does not install packages into the PC's global Python environment.
+The release installer is designed for a fresh 64-bit Windows PC. One double-click installs a
+private Python runtime when needed, Wyzer and its speech stack, Ollama, the configured local AI
+model, shortcuts, and downloaded speech models. It preserves existing settings and data on
+reinstall.
 
 From the working source folder:
 
@@ -22,12 +24,17 @@ To make a ZIP for another Windows PC:
 powershell -ExecutionPolicy Bypass -File .\installer\build-release.ps1
 ```
 
-Copy `dist\Wyzer-Setup.zip` to the other PC, extract it, and double-click `Install Wyzer.cmd`. The
-release includes the current custom avatar frames, wake-word models, and pinned OpenWakeWord
-preprocessing models.
-The installer downloads the configured Faster-Whisper model. Pass `-SkipModelDownload` only when
-preparing an offline installation; voice recognition will not work until the Whisper model is
-installed.
+Copy `dist\Wyzer-Setup.zip` to the other PC, extract it, and double-click `Install Wyzer.cmd`.
+Nothing has to be installed manually first. The release includes the current custom avatar frames,
+wake-word models, and pinned OpenWakeWord preprocessing models. Setup downloads the remaining
+dependencies, the configured Faster-Whisper model, and the configured Ollama model, then runs a
+readiness check and starts Wyzer.
+
+The default installation requires internet access and several GB of free disk space. It writes a
+detailed log to `%LOCALAPPDATA%\Wyzer\install.log` so a failed setup has one obvious diagnostic.
+Use `-NoLaunch` to install without starting Wyzer. Advanced/offline packaging can use
+`-SkipModelDownload`, `-SkipLlmModelDownload`, or `-SkipLocalAISetup`; the skipped feature will not
+be ready until its model or runtime is provided later.
 
 The installer automatically detects NVIDIA GPUs and installs the CUDA 12.1 PyTorch build used by
 Kokoro TTS. Use `-TorchDevice cpu` to force the smaller CPU build or `-TorchDevice cuda` to require
