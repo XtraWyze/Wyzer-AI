@@ -308,6 +308,9 @@ def test_file_pack_activation_exposes_compact_content_write_schemas() -> None:
         "expected_occurrences",
         "expected_sha256",
     }
+    assert "CONTEXT_JSON user_folders" in active["write_text_file"]["properties"]["path"][
+        "description"
+    ]
     assert all(len(json.dumps(active[name])) < 1_500 for name in (
         "write_text_file",
         "edit_text_file",

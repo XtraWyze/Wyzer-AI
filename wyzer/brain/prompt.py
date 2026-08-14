@@ -6,6 +6,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+from wyzer.files.paths import common_user_folders
 from wyzer.models import ConversationState, WindowInfo, WorldStateSnapshot
 
 
@@ -98,6 +99,7 @@ class SystemPromptBuilder:
             scene_context = {}
         context: dict[str, Any] = {
             "operating_mode": world.operating_mode,
+            "user_folders": common_user_folders(),
             "foreground_window": (
                 window_context(world.foreground_window)
                 if world.foreground_window is not None
@@ -172,7 +174,10 @@ class SystemPromptBuilder:
             "artifacts, retries, recovery, or cross-step verification. Never mix plan creation with action "
             "or capability calls. Author all tool arguments; never ask the user for schema fields. On "
             "validation failure, silently correct arguments or choose the better direct tool. "
-            "Browser tools handle managed pages, URLs, tabs, and search. Files tools handle local paths; "
+            "Browser tools handle managed pages, URLs, tabs, and search. Files tools handle local paths. "
+            "Author exact absolute file paths from observed results or CONTEXT_JSON user_folders. When "
+            "the user names Desktop, Documents, Downloads, Pictures, Music, or Videos, use that grounded "
+            "folder location; never invent a relative folder with the same name. "
             "open_file launches one known file. Perception: inspect_screen reads or describes visible "
             "non-web text/messages/errors; activate_visual_target clicks a named visible button/target, "
             "never inspect_screen. Clipboard only: read_clipboard reads existing text, copy_selected_text "
