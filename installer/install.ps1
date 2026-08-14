@@ -2,7 +2,10 @@
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Wyzer"),
     [switch]$SkipModelDownload,
+    [switch]$SkipLocalAISetup,
+    [switch]$SkipLlmModelDownload,
     [switch]$NoShortcut,
+    [switch]$NoLaunch,
     [ValidateSet("auto", "cuda", "cpu")]
     [string]$TorchDevice = "auto"
 )
@@ -10,22 +13,273 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+if (-not [Environment]::Is64BitOperatingSystem) {
+    throw "Wyzer requires a 64-bit edition of Windows."
+}
+$windowsInfo = Get-ItemProperty `
+    "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" `
+    -ErrorAction Stop
+$windowsBuild = [int]$windowsInfo.CurrentBuildNumber
+if ($windowsBuild -lt 19045) {
+    throw "Wyzer requires Windows 10 22H2 or newer. This PC reports Windows build $windowsBuild."
+}
+
+$InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
+New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+$installLog = Join-Path $InstallRoot "install.log"
+try {
+    Start-Transcript -LiteralPath $installLog -Append | Out-Null
+} catch {
+    Write-Warning "The detailed install log could not be started: $($_.Exception.Message)"
+}
+
+function Write-InstallStep([string]$Message) {
+    Write-Host ""
+    Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function Test-Python311(
+    [string]$Executable,
+    [string[]]$Prefix = @()
+) {
+    if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { return $false }
+    & $Executable @Prefix -c "import struct,sys; raise SystemExit(0 if sys.version_info[:2] == (3,11) and struct.calcsize('P') == 8 else 1)" 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
+}
+
 function Find-Python311 {
-    $launcher = Get-Command py -ErrorAction SilentlyContinue
-    if ($null -ne $launcher) {
-        & $launcher.Source -3.11 -c "import struct,sys; raise SystemExit(0 if sys.version_info[:2] == (3,11) and struct.calcsize('P') == 8 else 1)" 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            return [PSCustomObject]@{ Executable = $launcher.Source; Prefix = @("-3.11") }
-        }
+    $privatePython = Join-Path $InstallRoot "Python311\python.exe"
+    if (Test-Python311 $privatePython) {
+        return [PSCustomObject]@{ Executable = $privatePython; Prefix = @() }
     }
+
+    $launcher = Get-Command py -ErrorAction SilentlyContinue
+    if ($null -ne $launcher -and (Test-Python311 $launcher.Source @("-3.11"))) {
+        return [PSCustomObject]@{ Executable = $launcher.Source; Prefix = @("-3.11") }
+    }
+
     $python = Get-Command python -ErrorAction SilentlyContinue
-    if ($null -ne $python) {
-        & $python.Source -c "import struct,sys; raise SystemExit(0 if sys.version_info[:2] == (3,11) and struct.calcsize('P') == 8 else 1)" 2>$null
-        if ($LASTEXITCODE -eq 0) {
+    if ($null -ne $python -and $python.Source -notlike "*\WindowsApps\*") {
+        if (Test-Python311 $python.Source) {
             return [PSCustomObject]@{ Executable = $python.Source; Prefix = @() }
         }
     }
-    throw "Wyzer requires 64-bit Python 3.11. Install it from python.org, then rerun this installer."
+
+    $knownLocations = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python311\python.exe"),
+        (Join-Path $env:ProgramFiles "Python311\python.exe")
+    )
+    foreach ($candidate in $knownLocations) {
+        if (Test-Python311 $candidate) {
+            return [PSCustomObject]@{ Executable = $candidate; Prefix = @() }
+        }
+    }
+    return $null
+}
+
+function Assert-TrustedInstaller(
+    [string]$Path,
+    [string[]]$ExpectedPublishers
+) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+        throw "The downloaded installer did not have a valid Windows signature: $Path"
+    }
+    $subject = [string]$signature.SignerCertificate.Subject
+    if (-not @($ExpectedPublishers | Where-Object { $subject -like "*$_*" })) {
+        throw "The downloaded installer was signed by an unexpected publisher: $subject"
+    }
+}
+
+function Save-TrustedDownload(
+    [string]$Uri,
+    [string]$Destination,
+    [string[]]$ExpectedPublishers
+) {
+    [Net.ServicePointManager]::SecurityProtocol = `
+        [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $Destination
+    Assert-TrustedInstaller $Destination $ExpectedPublishers
+}
+
+function Test-SupportedVisualCppVersion([string]$Version) {
+    try {
+        return [Version]($Version.TrimStart([char]"v")) -ge [Version]"14.20.0.0"
+    } catch {
+        return $false
+    }
+}
+
+function Test-VisualCppRuntime {
+    $registryPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+    )
+    foreach ($registryPath in $registryPaths) {
+        $runtime = Get-ItemProperty -LiteralPath $registryPath -ErrorAction SilentlyContinue
+        if ($null -ne $runtime -and $runtime.Installed -eq 1 -and `
+            (Test-SupportedVisualCppVersion ([string]$runtime.Version))) {
+            return $true
+        }
+    }
+    $systemDirectory = Join-Path $env:WINDIR "System32"
+    $runtimeFile = Get-Item -LiteralPath `
+        (Join-Path $systemDirectory "vcruntime140_1.dll") `
+        -ErrorAction SilentlyContinue
+    return $null -ne $runtimeFile -and `
+        (Test-SupportedVisualCppVersion ([string]$runtimeFile.VersionInfo.FileVersion))
+}
+
+function Install-VisualCppRuntime {
+    if (Test-VisualCppRuntime) {
+        Write-Host "Microsoft Visual C++ runtime is ready."
+        return
+    }
+
+    Write-InstallStep "Installing Microsoft's Windows runtime libraries"
+    $installer = Join-Path ([IO.Path]::GetTempPath()) "wyzer-vc-redist-x64.exe"
+    try {
+        Save-TrustedDownload `
+            "https://aka.ms/vc14/vc_redist.x64.exe" `
+            $installer `
+            @("Microsoft Corporation")
+        $process = Start-Process -FilePath $installer `
+            -ArgumentList "/install /quiet /norestart" -Wait -PassThru
+        if ($process.ExitCode -notin @(0, 1638, 3010)) {
+            throw "The Microsoft Visual C++ runtime installer returned exit code $($process.ExitCode)."
+        }
+        if ($process.ExitCode -eq 3010) {
+            Write-Warning "Windows requested a restart after installing its runtime libraries. Finish setup first, then restart before launching Wyzer if readiness fails."
+        }
+    } finally {
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-VisualCppRuntime)) {
+        throw "Microsoft Visual C++ runtime installation completed, but the x64 runtime is still unavailable."
+    }
+}
+
+function Install-PrivatePython311 {
+    $target = Join-Path $InstallRoot "Python311"
+    $installer = Join-Path ([IO.Path]::GetTempPath()) "wyzer-python-3.11.9-amd64.exe"
+    Write-InstallStep "Installing Wyzer's private Python runtime"
+    try {
+        Save-TrustedDownload `
+            "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" `
+            $installer `
+            @("Python Software Foundation")
+        $arguments = '/quiet InstallAllUsers=0 TargetDir="' + $target + '" Include_launcher=0 Include_test=0 Include_doc=0 Include_tcltk=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_pip=1'
+        $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+        if ($process.ExitCode -ne 0) {
+            throw "The Python installer returned exit code $($process.ExitCode)."
+        }
+    } finally {
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    }
+    $python = Find-Python311
+    if ($null -eq $python) {
+        throw "Wyzer could not prepare its private 64-bit Python 3.11 runtime."
+    }
+    return $python
+}
+
+function Refresh-ProcessPath {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = @($machinePath, $userPath, $env:Path) -join ";"
+}
+
+function Find-Ollama {
+    Refresh-ProcessPath
+    $command = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($null -ne $command -and (Test-Path -LiteralPath $command.Source -PathType Leaf)) {
+        return $command.Source
+    }
+    $knownLocations = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"),
+        (Join-Path $env:ProgramFiles "Ollama\ollama.exe")
+    )
+    foreach ($candidate in $knownLocations) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    return $null
+}
+
+function Install-Ollama {
+    $ollama = Find-Ollama
+    if ($null -ne $ollama) { return $ollama }
+
+    Write-InstallStep "Installing Ollama for Wyzer's local AI"
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($null -ne $winget) {
+        & $winget.Source install --id Ollama.Ollama --exact --source winget --silent `
+            --accept-package-agreements --accept-source-agreements --disable-interactivity
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "WinGet could not install Ollama. Trying Ollama's official installer."
+        }
+        $ollama = Find-Ollama
+    }
+
+    if ($null -eq $ollama) {
+        $installer = Join-Path ([IO.Path]::GetTempPath()) "wyzer-ollama-setup.exe"
+        try {
+            Save-TrustedDownload `
+                "https://ollama.com/download/OllamaSetup.exe" `
+                $installer `
+                @("Ollama")
+            $process = Start-Process -FilePath $installer `
+                -ArgumentList "/VERYSILENT /NORESTART" -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+                throw "The Ollama installer returned exit code $($process.ExitCode)."
+            }
+        } finally {
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+        }
+        $ollama = Find-Ollama
+    }
+
+    if ($null -eq $ollama) {
+        throw "Ollama was installed, but Wyzer could not find ollama.exe."
+    }
+    return $ollama
+}
+
+function Test-OllamaReady {
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:11434/api/tags" `
+            -TimeoutSec 3 | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Start-OllamaAndWait([string]$Executable) {
+    if (Test-OllamaReady) { return }
+    Start-Process -FilePath $Executable -ArgumentList "serve" -WindowStyle Hidden | Out-Null
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        if (Test-OllamaReady) { return }
+        Start-Sleep -Seconds 1
+    }
+    throw "Ollama did not become ready at http://127.0.0.1:11434."
+}
+
+function Install-OllamaModel(
+    [string]$Executable,
+    [string]$Model
+) {
+    Start-OllamaAndWait $Executable
+    & $Executable show $Model 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Local AI model is already ready: $Model"
+        return
+    }
+    Write-InstallStep "Downloading the local AI model ($Model)"
+    Write-Host "This is the largest download and may take a while. It resumes if interrupted."
+    & $Executable pull $Model
+    if ($LASTEXITCODE -ne 0) { throw "Ollama could not download $Model." }
+    & $Executable show $Model 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Ollama did not report $Model after downloading it." }
 }
 
 function Copy-NewFiles([string]$Source, [string]$Destination) {
@@ -89,7 +343,7 @@ function Install-OpenWakeWordSupportModels(
         "melspectrogram.onnx" = "BA2B0E0F8B7B875369A2C89CB13360FF53BAC436F2895CCED9F479FA65EB176F"
         "embedding_model.onnx" = "70D164290C1D095D1D4EE149BC5E00543250A7316B59F31D056CFF7BD3075C1F"
     }
-    $installedRoot = & $PythonExecutable -c "from pathlib import Path; import openwakeword; print(Path(openwakeword.__file__).resolve().parent / 'resources' / 'models')" 2>$null
+    $installedRoot = & $PythonExecutable -c "from importlib.util import find_spec; from pathlib import Path; spec = find_spec('openwakeword'); assert spec is not None and spec.origin; print(Path(spec.origin).resolve().parent / 'resources' / 'models')" 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $installedRoot) {
         throw "Could not locate OpenWakeWord's installed support-model directory."
     }
@@ -170,16 +424,21 @@ if (@(Get-ChildItem -LiteralPath $wakeSource -Filter "*.onnx" -File).Count -eq 0
 }
 
 $python = Find-Python311
-New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+if ($null -eq $python) {
+    $python = Install-PrivatePython311
+} else {
+    Write-Host "Using compatible Python: $($python.Executable)"
+}
+Install-VisualCppRuntime
 $venv = Join-Path $InstallRoot ".venv"
 $venvPython = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $venvPython)) {
-    Write-Host "Creating Wyzer's private Python environment..."
+    Write-InstallStep "Creating Wyzer's private app environment"
     & $python.Executable @($python.Prefix) -m venv $venv
     if ($LASTEXITCODE -ne 0) { throw "Could not create the Wyzer virtual environment." }
 }
 
-Write-Host "Installing the tested Wyzer dependency set..."
+Write-InstallStep "Installing Wyzer and its tested dependencies"
 & $venvPython -m pip install --upgrade pip wheel
 if ($LASTEXITCODE -ne 0) { throw "Could not update the installer tools." }
 & $venvPython -m pip install --constraint $constraints "$packageSource[audio,ui]"
@@ -234,6 +493,24 @@ Install-WakeWordModels $wakeSource @(
     $configuredWakeDirectory
 )
 
+$llmDetailsOutput = & $venvPython -c "import json; from wyzer.config import WyzerSettings; from wyzer.runtime_paths import configure_runtime_paths, find_config_path; p=find_config_path(); s=configure_runtime_paths(WyzerSettings.load(p), p); print(json.dumps({'provider': s.llm.provider, 'model': s.llm.model, 'endpoint': str(s.llm.endpoint) if s.llm.endpoint else ''}))" 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $llmDetailsOutput) {
+    throw "Could not read the local AI settings from $configTarget"
+}
+$llmDetails = [string]($llmDetailsOutput | Select-Object -Last 1) | ConvertFrom-Json
+$localOllama = $llmDetails.provider -eq "ollama" -and `
+    ([Uri]$llmDetails.endpoint).Host -in @("127.0.0.1", "localhost")
+if ($localOllama -and -not $SkipLocalAISetup) {
+    $ollama = Install-Ollama
+    if (-not $SkipLlmModelDownload) {
+        Install-OllamaModel $ollama ([string]$llmDetails.model)
+    } else {
+        Write-Warning "The local AI model download was skipped. Chat will not work until '$($llmDetails.model)' is pulled with Ollama."
+    }
+} elseif ($localOllama) {
+    Write-Warning "Local AI setup was skipped. Install Ollama and pull '$($llmDetails.model)' before using chat."
+}
+
 $launcherPath = Join-Path $InstallRoot "Start Wyzer.cmd"
 $hiddenLauncherPath = Join-Path $InstallRoot "Start Wyzer.vbs"
 $consolePath = Join-Path $InstallRoot "Wyzer Console.cmd"
@@ -260,6 +537,7 @@ pause
 [System.IO.File]::WriteAllText($hiddenLauncherPath, $hiddenLauncherText, [System.Text.ASCIIEncoding]::new())
 [System.IO.File]::WriteAllText($consolePath, $consoleText, [System.Text.ASCIIEncoding]::new())
 
+$shortcutPath = $null
 if (-not $NoShortcut) {
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "Wyzer.lnk"
@@ -272,9 +550,14 @@ if (-not $NoShortcut) {
     $shortcut.Description = "Start Wyzer as administrator"
     $shortcut.Save()
     Set-ShortcutRunAsAdministrator $shortcutPath
+
+    $startMenuDirectory = Join-Path ([Environment]::GetFolderPath("Programs")) "Wyzer"
+    New-Item -ItemType Directory -Force -Path $startMenuDirectory | Out-Null
+    $startMenuShortcutPath = Join-Path $startMenuDirectory "Wyzer.lnk"
+    Copy-Item -LiteralPath $shortcutPath -Destination $startMenuShortcutPath -Force
 }
 
-Write-Host "Checking avatars, wake models, speech packages, and Whisper..."
+Write-InstallStep "Running the final readiness check"
 $checkArguments = @("-m", "wyzer.install_check")
 if ($SkipModelDownload) {
     $checkArguments += "--allow-missing-model"
@@ -289,6 +572,18 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Wyzer is installed at $InstallRoot"
+Write-Host "Wyzer is ready." -ForegroundColor Green
+Write-Host "Installed at: $InstallRoot"
+Write-Host "Install log: $installLog"
 Write-Host "Use 'Start Wyzer.cmd' or the desktop shortcut to launch it."
 Write-Host "Use 'Wyzer Console.cmd' if you need to see startup errors."
+
+if (-not $NoLaunch) {
+    Write-Host "Starting Wyzer..."
+    if ($null -ne $shortcutPath -and (Test-Path -LiteralPath $shortcutPath)) {
+        Start-Process -FilePath $shortcutPath | Out-Null
+    } else {
+        Start-Process -FilePath (Join-Path $env:WINDIR "System32\wscript.exe") `
+            -ArgumentList "`"$hiddenLauncherPath`"" | Out-Null
+    }
+}

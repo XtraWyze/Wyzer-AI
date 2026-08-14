@@ -9,9 +9,10 @@
 ## Download
 
 For the simplest Windows installation, download the latest `Wyzer-Setup.zip` from
-[Releases](https://github.com/XtraWyze/Wyzer-Ai/releases/latest), extract it, and follow its
-`README.txt`. The installer uses a private Python environment and does not modify global Python
-packages.
+[Releases](https://github.com/XtraWyze/Wyzer-Ai/releases/latest), extract it, and double-click
+`Install Wyzer.cmd`. On a fresh 64-bit Windows PC, setup installs its own Python runtime, Ollama,
+the local AI model, speech dependencies, models, and shortcuts, then checks the installation and
+starts Wyzer. No PowerShell commands or manual prerequisites are required.
 
 Wyzer is a local, LLM-first Windows desktop assistant. It uses native model tool calling for
 desktop actions while keeping every effect behind a typed, registered, deterministic tool.
