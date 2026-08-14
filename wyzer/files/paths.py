@@ -4,7 +4,49 @@ from __future__ import annotations
 
 import math
 import ntpath
+import os
 import re
+from functools import lru_cache
+from pathlib import Path
+
+_USER_FOLDER_REGISTRY_VALUES = {
+    "desktop": "Desktop",
+    "documents": "Personal",
+    "downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
+    "pictures": "My Pictures",
+    "music": "My Music",
+    "videos": "My Video",
+}
+
+
+@lru_cache(maxsize=1)
+def common_user_folders() -> dict[str, str]:
+    """Return exact common-folder locations for grounding model-authored paths."""
+
+    home = Path.home().resolve(strict=False)
+    folders = {
+        name: str((home / name.title()).resolve(strict=False))
+        for name in _USER_FOLDER_REGISTRY_VALUES
+    }
+    if os.name != "nt":
+        return folders
+
+    try:
+        import winreg
+
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            for name, value_name in _USER_FOLDER_REGISTRY_VALUES.items():
+                try:
+                    raw_path, _ = winreg.QueryValueEx(key, value_name)
+                except OSError:
+                    continue
+                if isinstance(raw_path, str) and raw_path.strip():
+                    expanded = os.path.expandvars(raw_path).strip()
+                    folders[name] = str(Path(expanded).expanduser().resolve(strict=False))
+    except OSError:
+        pass
+    return folders
 
 
 def dominant_location(paths: list[str], query: str | None = None) -> str:

@@ -1,4 +1,5 @@
 from wyzer.brain import SystemPromptBuilder
+from wyzer.brain import prompt as prompt_module
 from wyzer.models import (
     BrowserScene,
     ConversationState,
@@ -17,6 +18,20 @@ def test_system_prompt_is_concise_and_describes_native_tool_behavior() -> None:
     assert "do not be dramatic" in prompt
     assert "ExecutionPlan" not in prompt
     assert "output_schema" not in prompt
+
+
+def test_system_prompt_grounds_model_authored_common_folder_paths(monkeypatch) -> None:
+    monkeypatch.setattr(
+        prompt_module,
+        "common_user_folders",
+        lambda: {"desktop": r"C:\Users\me\Desktop"},
+    )
+
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert '"user_folders":{"desktop":"C:\\\\Users\\\\me\\\\Desktop"}' in prompt
+    assert "Author exact absolute file paths" in prompt
+    assert "never invent a relative folder" in prompt
 
 
 def test_system_prompt_grounds_self_awareness_in_runtime_capability_context() -> None:

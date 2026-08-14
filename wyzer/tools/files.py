@@ -27,6 +27,11 @@ from wyzer.models import (
 )
 from wyzer.tools.base import Tool, ToolContext, ToolExecutionError
 
+_EXACT_PATH_DESCRIPTION = (
+    "Exact absolute local path. For a common user folder, use its location from "
+    "CONTEXT_JSON user_folders; do not use a bare relative name such as Desktop."
+)
+
 
 class SearchFilesArguments(ToolArguments):
     query: str = Field(min_length=1, max_length=500)
@@ -35,12 +40,12 @@ class SearchFilesArguments(ToolArguments):
 
 
 class ReadTextFileArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     maximum_characters: int = Field(default=20_000, ge=100, le=100_000)
 
 
 class WriteTextFileArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     content: str = Field(max_length=1_000_000)
     overwrite: bool = Field(
         default=False,
@@ -50,7 +55,7 @@ class WriteTextFileArguments(ToolArguments):
 
 
 class EditTextFileArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     old_text: str = Field(min_length=1, max_length=500_000)
     new_text: str = Field(max_length=500_000)
     expected_occurrences: int = Field(default=1, ge=1, le=1_000)
@@ -62,7 +67,7 @@ class EditTextFileArguments(ToolArguments):
 
 
 class AppendTextFileArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     content: str = Field(max_length=1_000_000)
     create: bool = False
     create_parents: bool = False
@@ -80,28 +85,28 @@ class DeepScanFileIndexArguments(ToolArguments):
 
 
 class ListDirectoryArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     include_hidden: bool = False
     limit: int = Field(default=100, ge=1, le=500)
 
 
 class CreateDirectoryArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     parents: bool = True
 
 
 class CopyPathArguments(ToolArguments):
-    source: Path
-    destination: Path
+    source: Path = Field(description=_EXACT_PATH_DESCRIPTION)
+    destination: Path = Field(description=_EXACT_PATH_DESCRIPTION)
 
 
 class MovePathArguments(ToolArguments):
-    source: Path
-    destination: Path
+    source: Path = Field(description=_EXACT_PATH_DESCRIPTION)
+    destination: Path = Field(description=_EXACT_PATH_DESCRIPTION)
 
 
 class RenamePathArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
     new_name: str = Field(
         min_length=1,
         max_length=255,
@@ -118,7 +123,7 @@ class RenamePathArguments(ToolArguments):
 
 
 class DeletePathArguments(ToolArguments):
-    path: Path
+    path: Path = Field(description=_EXACT_PATH_DESCRIPTION)
 
 
 class OpenIndexedFolderArguments(ToolArguments):

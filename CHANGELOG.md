@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.9] - 2026-08-14
+
+### Fixed
+
+- Ground the LLM with the current Windows user's configured Desktop, Documents, Downloads,
+  Pictures, Music, and Videos locations when it authors file paths.
+- Describe file-tool paths as exact absolute paths so requests such as "put it on my desktop" use
+  the user's real Desktop instead of creating a relative `Desktop` folder.
+
 ## [0.2.8] - 2026-08-13
 
 ### Fixed
