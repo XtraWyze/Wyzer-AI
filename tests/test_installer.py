@@ -94,7 +94,10 @@ def test_installer_pulls_the_model_from_the_effective_config_and_launches() -> N
     installer = (INSTALLER_DIRECTORY / "install.ps1").read_text(encoding="utf-8")
 
     assert "Install-OllamaModel $ollama ([string]$llmDetails.model)" in installer
-    assert "& $Executable pull $Model" in installer
+    assert "Test-OllamaModel $Model" in installer
+    assert "Invoke-RestMethod -UseBasicParsing `" in installer
+    assert '-ArgumentList @("pull", $Model)' in installer
+    assert "& $Executable show $Model" not in installer
     assert 'Join-Path ([Environment]::GetFolderPath("Programs")) "Wyzer"' in installer
     assert "if (-not $NoLaunch)" in installer
     assert 'Join-Path $InstallRoot "install.log"' in installer
