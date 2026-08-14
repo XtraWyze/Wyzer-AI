@@ -2,6 +2,15 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.3.0] - 2026-08-14
+
+### Fixed
+
+- Check Ollama's installed-model list through its local API instead of running `ollama show` and
+  treating the expected "model not found" result as a fatal PowerShell error.
+- Pull the configured Ollama model in a child process whose exit code can be checked without native
+  stderr bypassing the installer's friendly error handling.
+
 ## [0.2.11] - 2026-08-14
 
 ### Changed

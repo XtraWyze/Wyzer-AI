@@ -264,22 +264,40 @@ function Start-OllamaAndWait([string]$Executable) {
     throw "Ollama did not become ready at http://127.0.0.1:11434."
 }
 
+function Test-OllamaModel([string]$Model) {
+    try {
+        $response = Invoke-RestMethod -UseBasicParsing `
+            -Uri "http://127.0.0.1:11434/api/tags" `
+            -TimeoutSec 10
+        foreach ($installedModel in @($response.models)) {
+            if ($installedModel.name -eq $Model) {
+                return $true
+            }
+        }
+        return $false
+    } catch {
+        throw "Ollama's installed-model list could not be read: $($_.Exception.Message)"
+    }
+}
+
 function Install-OllamaModel(
     [string]$Executable,
     [string]$Model
 ) {
     Start-OllamaAndWait $Executable
-    & $Executable show $Model 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    if (Test-OllamaModel $Model) {
         Write-Host "Local AI model is already ready: $Model"
         return
     }
     Write-InstallStep "Downloading the local AI model ($Model)"
     Write-Host "This is the largest download and may take a while. It resumes if interrupted."
-    & $Executable pull $Model
-    if ($LASTEXITCODE -ne 0) { throw "Ollama could not download $Model." }
-    & $Executable show $Model 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Ollama did not report $Model after downloading it." }
+    $pull = Start-Process -FilePath $Executable `
+        -ArgumentList @("pull", $Model) `
+        -NoNewWindow -Wait -PassThru
+    if ($pull.ExitCode -ne 0) { throw "Ollama could not download $Model." }
+    if (-not (Test-OllamaModel $Model)) {
+        throw "Ollama did not report $Model after downloading it."
+    }
 }
 
 function Copy-NewFiles([string]$Source, [string]$Destination) {
