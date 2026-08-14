@@ -217,6 +217,82 @@
     }
   },
   {
+    "case_id": "create_text_file_without_editor_e2e",
+    "requested_goal": "Make a text file called test on my Desktop with the word test123 in it. Do not open Notepad or another editor.",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "write_text_file"]
+    ],
+    "prohibited_tools": [
+      "open_application",
+      "open_file",
+      "type_desktop_text",
+      "task_plan_create"
+    ],
+    "required_final_outcome": "A test.txt file is written directly with the requested content without opening or typing into an editor.",
+    "outcomes": [
+      {
+        "name": "text_file_written_directly",
+        "required_tools": [
+          {
+            "tool": "write_text_file",
+            "argument_options": {"content": ["test123"]}
+          }
+        ]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": ["search_files", "inspect_screen"]
+    },
+    "mock_results": {
+      "write_text_file": {
+        "created": true,
+        "characters_written": 7,
+        "summary": "Created text file."
+      }
+    }
+  },
+  {
+    "case_id": "create_batch_file_without_editor_e2e",
+    "requested_goal": "Create a correctly formatted batch file on my Desktop that opens Facebook. Do not open Notepad or any other editor.",
+    "allowed_tool_paths": [
+      ["activate_file_tools", "write_text_file"]
+    ],
+    "prohibited_tools": [
+      "open_application",
+      "open_file",
+      "type_desktop_text",
+      "task_plan_create"
+    ],
+    "required_final_outcome": "A .bat file is written directly with separate command lines and without opening or typing into an editor.",
+    "outcomes": [
+      {
+        "name": "batch_file_written_directly",
+        "required_tools": [{"tool": "write_text_file"}]
+      }
+    ],
+    "maximum_model_rounds": 5,
+    "clarification": "forbidden",
+    "confirmation": "none",
+    "efficiency": {
+      "ideal_first_tools": ["activate_file_tools"],
+      "ideal_provider_rounds": 2,
+      "ideal_tool_calls": 2,
+      "unnecessary_observation_tools": ["search_files", "inspect_screen"]
+    },
+    "mock_results": {
+      "write_text_file": {
+        "created": true,
+        "summary": "Created text file."
+      }
+    }
+  },
+  {
     "case_id": "delete_known_file_e2e",
     "requested_goal": "Delete C:\\Users\\Public\\old-notes.txt by moving it to the Recycle Bin.",
     "allowed_tool_paths": [

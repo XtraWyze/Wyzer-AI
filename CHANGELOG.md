@@ -2,6 +2,17 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.2.10] - 2026-08-14
+
+### Fixed
+
+- Guide the LLM to create and edit text-based files through native file tools instead of opening
+  Notepad or typing into another desktop editor unless the user explicitly requests that editor.
+- Preserve requested line breaks in generated batch files, use a single `.bat` extension, and infer
+  `.txt` when the user requests a text file without naming an extension.
+- Add acceptance and end-to-end trajectory coverage that rejects app launching, file opening,
+  desktop typing, and unnecessary planning for direct text and batch file creation.
+
 ## [0.2.9] - 2026-08-14
 
 ### Fixed

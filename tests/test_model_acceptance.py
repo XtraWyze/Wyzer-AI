@@ -38,6 +38,8 @@ def test_model_acceptance_cases_are_valid_and_cover_key_routes() -> None:
         "count_installed_games",
         "list_installed_games_reported",
         "open_named_project_folder",
+        "create_text_file_directly",
+        "create_batch_file_directly",
     } <= identifiers
 
 

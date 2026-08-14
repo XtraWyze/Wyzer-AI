@@ -48,6 +48,8 @@ def test_end_to_end_cases_are_valid_and_cover_required_categories() -> None:
         "unqualified_chrome_close_e2e",
         "search_known_file_e2e",
         "read_known_file_e2e",
+        "create_text_file_without_editor_e2e",
+        "create_batch_file_without_editor_e2e",
         "delete_known_file_e2e",
         "click_retry_e2e",
         "open_named_project_folder_e2e",
@@ -134,6 +136,33 @@ def test_delete_requires_registered_confirmation_boundary(
     assert report.results[0].passed is True
     assert report.results[0].confirmation_boundaries == ["delete_path"]
     assert report.results[0].executed_calls[-1].confirmation_required is True
+
+
+def test_text_file_creation_uses_direct_writer_without_editor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeChatProvider(
+        [
+            tool_response(("activate_file_tools", {})),
+            tool_response(
+                (
+                    "write_text_file",
+                    {
+                        "path": "C:\\Users\\Public\\Desktop\\test.txt",
+                        "content": "test123",
+                    },
+                )
+            ),
+        ]
+    )
+
+    report = _evaluate(monkeypatch, _case("create_text_file_without_editor_e2e"), provider)
+    result = report.results[0]
+
+    assert result.passed is True
+    assert result.successful_tool_path == ["activate_file_tools", "write_text_file"]
+    assert result.executed_calls[-1].arguments["content"] == "test123"
+    assert result.confirmation_boundaries == []
 
 
 def test_unqualified_chrome_close_executes_without_confirmation(

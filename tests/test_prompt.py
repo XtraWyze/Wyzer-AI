@@ -157,6 +157,17 @@ def test_system_prompt_routes_game_inventory_and_named_projects_semantically() -
     assert "Copy user-supplied names verbatim" in prompt
 
 
+def test_system_prompt_routes_text_and_batch_creation_to_direct_file_tools() -> None:
+    prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
+
+    assert "create, write, append, or edit a text-based file" in prompt
+    assert "use activate_file_tools" in prompt
+    assert "Never open Notepad or another editor" in prompt
+    assert "text file named without an extension means a .txt file" in prompt
+    assert "batch file uses exactly one .bat extension" in prompt
+    assert "put separate commands on separate lines" in prompt
+
+
 def test_system_prompt_explains_capability_activation_is_not_the_action() -> None:
     prompt = SystemPromptBuilder().build(WorldStateSnapshot(), ConversationState())
 
