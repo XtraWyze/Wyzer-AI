@@ -51,6 +51,7 @@ def create_default_registry(
     perception_options: dict[str, object] | None = None,
     enabled_entrypoint_packs: Sequence[str] = (),
     extra_pack_factories: Sequence[ToolPackFactory] = (),
+    coding_agent_enabled: bool = True,
 ) -> ToolRegistry:
     from wyzer.tools.factory import create_default_registry as create
 
@@ -60,6 +61,7 @@ def create_default_registry(
         perception_options=perception_options,
         enabled_entrypoint_packs=enabled_entrypoint_packs,
         extra_pack_factories=extra_pack_factories,
+        coding_agent_enabled=coding_agent_enabled,
     )
 
 

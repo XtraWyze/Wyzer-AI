@@ -5,6 +5,15 @@ maximum_tool_rounds = 12
 confirmation_ttl_seconds = 120
 tool_result_context_characters = 4000
 
+[coding_agent]
+enabled = true
+maximum_rounds = 12
+maximum_history_messages = 40
+tool_result_context_characters = 6000
+command_timeout_seconds = 60
+maximum_output_characters = 12000
+max_response_tokens = 1024
+
 [task_engine]
 enabled = true
 state_path = ".wyzer/task-state.json"

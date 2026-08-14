@@ -272,5 +272,23 @@
     "prompt": "Click the Retry button.",
     "expected_tools": ["activate_visual_target"],
     "forbidden_tools": ["inspect_screen"]
+  },
+  {
+    "case_id": "create_python_calculator_with_coding_agent",
+    "prompt": "Make me a usable Python calculator and test it.",
+    "expected_tools": ["coding_agent_start"],
+    "forbidden_tools": ["write_text_file", "task_plan_create", "coding_agent_cancel"]
+  },
+  {
+    "case_id": "create_new_python_game_with_coding_agent",
+    "prompt": "Create a small Python number guessing game in C:\\Projects\\TestGame, run it, and fix any errors.",
+    "expected_tools": ["coding_agent_start"],
+    "forbidden_tools": ["create_directory", "write_text_file", "task_plan_create", "coding_agent_cancel"]
+  },
+  {
+    "case_id": "create_desktop_relative_python_game_with_coding_agent",
+    "prompt": "Create a small Python number guessing game in Desktop\\Projects\\TestGame, run it, and fix any errors.",
+    "expected_tools": ["coding_agent_start"],
+    "forbidden_tools": ["create_directory", "write_text_file", "task_plan_create", "coding_agent_cancel"]
   }
 ]

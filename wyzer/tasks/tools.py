@@ -52,9 +52,9 @@ def task_native_tools(*, active_plan: bool | None = None) -> list[NativeToolDefi
     """
     descriptions = {
         "task_plan_create": (
-            "Complex workflows only: dependencies, intermediate artifacts, retries, recovery, or "
-            "cross-step verification. Never for one count, list, lookup, or open, including after "
-            "capability activation; author goal and steps yourself."
+            "Not for software creation, editing, running, testing, or debugging: activate "
+            "coding_agent instead. Only plan complex workflows spanning different capabilities. "
+            "Never plan a count, list, lookup, open, or activation; author fields yourself."
         ),
         "task_step_update": (
             "Update the current step from evidence; verified requires observed or explicit success."

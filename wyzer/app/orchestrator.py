@@ -21,6 +21,7 @@ from wyzer.brain import (
     OrchestratorFeatures,
     SystemPromptBuilder,
 )
+from wyzer.coding.manager import CodingAgentManager
 from wyzer.conversation import ConversationManager, SessionContextManager
 from wyzer.events import EventLedger
 from wyzer.memory import MemoryStore, SensitiveMemoryError
@@ -102,6 +103,7 @@ class Orchestrator:
         tasks: TaskStateStore | None = None,
         personality: dict[str, object] | None = None,
         detailed_output_tokens: int = 1_024,
+        coding_manager: CodingAgentManager | None = None,
     ) -> None:
         if maximum_tool_rounds < 1:
             raise ValueError("maximum tool rounds must be positive")
@@ -124,6 +126,7 @@ class Orchestrator:
             OrchestratorFeatures(persistent_complex_task_planning=tasks is not None),
         )
         self._detailed_output_tokens = detailed_output_tokens
+        self.coding_manager = coding_manager
         self._confirmation_policy = confirmation_policy or ConfirmationPolicy()
         self._memory = memory
         self._tasks = tasks
@@ -905,7 +908,17 @@ class Orchestrator:
             step_id=step_id,
             tool_name=call.function.name,
         )
-        result = await self._executor.execute(call.function.name, arguments, action_id, step_id)
+        if (
+            self.coding_manager is not None
+            and call.function.name in self.coding_manager.PROXY_TOOLS
+        ):
+            result = await self.coding_manager.execute_proxy(
+                call.function.name, arguments, action_id, step_id
+            )
+        else:
+            result = await self._executor.execute(
+                call.function.name, arguments, action_id, step_id
+            )
         self._event(
             EventKind.TOOL_COMPLETED if result.ok else EventKind.TOOL_FAILED,
             action_id,
@@ -1030,6 +1043,18 @@ class Orchestrator:
                     content="TASK_PLAN_JSON=" + json.dumps(task_context, separators=(",", ":")),
                 )
             )
+        if self.coding_manager is not None:
+            coding_context = self.coding_manager.model_context()
+            if coding_context:
+                messages.append(
+                    ChatMessage(
+                        role="system",
+                        content=(
+                            "CODING_AGENT_CONTEXT_JSON="
+                            + json.dumps(coding_context, separators=(",", ":"), default=str)
+                        ),
+                    )
+                )
         return [*messages, *conversation.model_messages]
 
     async def _request_provider(
@@ -1075,6 +1100,8 @@ class Orchestrator:
             task = self._provider_task
         if task is not None:
             task.cancel()
+        if self.coding_manager is not None:
+            self.coding_manager.cancel_action(target)
         self._executor.cancel(target)
         self._clear_confirmation()
         self._event(EventKind.TASK_INTERRUPTED, target, success=True)

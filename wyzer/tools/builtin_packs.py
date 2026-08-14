@@ -152,6 +152,7 @@ BUILTIN_PACK_NAMES = (
     "audio",
     "browser",
     "clipboard",
+    "coding_agent",
     "desktop_interaction",
     "diagnostics",
     "perception",

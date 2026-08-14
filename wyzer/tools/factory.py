@@ -22,6 +22,7 @@ def create_default_registry(
     perception_options: dict[str, object] | None = None,
     enabled_entrypoint_packs: Sequence[str] = (),
     extra_pack_factories: Sequence[ToolPackFactory] = (),
+    coding_agent_enabled: bool = True,
 ) -> ToolRegistry:
     """Build a fresh registry for the main process or an isolated worker.
 
@@ -37,6 +38,13 @@ def create_default_registry(
     registry.register_pack(
         FileToolPack(FileCatalog(file_index_path()), backend), default_visible=False
     )
+    if coding_agent_enabled:
+        from wyzer.coding.proxy import create_coding_agent_pack
+
+        # Four compact proxies are the entire main-model coding surface. Keeping
+        # them visible avoids a small model wrapping one self-contained coding
+        # delegation in a redundant outer task plan before capability activation.
+        registry.register_pack(create_coding_agent_pack(), default_visible=True)
     for pack_factory in extra_pack_factories:
         registry.register_pack(pack_factory(), default_visible=False)
     for pack in load_enabled_tool_packs(tuple(enabled_entrypoint_packs)):
