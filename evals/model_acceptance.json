@@ -180,6 +180,28 @@
     "forbidden_tools": ["task_plan_create"]
   },
   {
+    "case_id": "create_text_file_directly",
+    "prompt": "Make a text file called test on my Desktop with the word test123 in it.",
+    "expected_tools": ["write_text_file"],
+    "forbidden_tools": [
+      "open_application",
+      "open_file",
+      "type_desktop_text",
+      "task_plan_create"
+    ]
+  },
+  {
+    "case_id": "create_batch_file_directly",
+    "prompt": "Create a correctly formatted batch file on my Desktop that opens Facebook. Do not open Notepad or any other editor.",
+    "expected_tools": ["write_text_file"],
+    "forbidden_tools": [
+      "open_application",
+      "open_file",
+      "type_desktop_text",
+      "task_plan_create"
+    ]
+  },
+  {
     "case_id": "delete_to_recycle_bin",
     "prompt": "Delete C:\\Users\\Public\\old-notes.txt by moving it to the Recycle Bin.",
     "expected_tools": ["delete_path"],

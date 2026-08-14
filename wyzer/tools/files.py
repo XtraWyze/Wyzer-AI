@@ -940,7 +940,10 @@ class ReadTextFileTool(FileToolBase, Tool[ReadTextFileArguments, TextFileResult]
 
 class WriteTextFileTool(FileToolBase, Tool[WriteTextFileArguments, TextMutationResult]):
     name = "write_text_file"
-    description = "Create a UTF-8 text file, or explicitly replace an existing text file."
+    description = (
+        "Directly create a UTF-8 text-based file without opening an editor, or explicitly replace "
+        "an existing text-based file. Supports plain text, batch files, scripts, and source code."
+    )
     arguments_type = WriteTextFileArguments
     result_type = TextMutationResult
     risk_level = RiskLevel.MEDIUM
@@ -1141,7 +1144,8 @@ class FileToolPack:
     name = "files"
     description = (
         "open named local folders/projects; search/read files; write/edit/append text; refresh the "
-        "file index; create/copy/move/rename/delete paths."
+        "file index; directly create text, batch, script, and source files without an editor; "
+        "create/copy/move/rename/delete paths."
     )
     activation_name = "file"
 
