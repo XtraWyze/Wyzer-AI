@@ -2,7 +2,7 @@
 
 All notable changes to Wyzer are documented here.
 
-## [0.3.0] - 2026-08-14
+## [0.3.1] - 2026-08-14
 
 ### Added
 
@@ -15,6 +15,8 @@ All notable changes to Wyzer are documented here.
 
 - Route software-development requests directly to the coding agent, preserve coding sessions across
   follow-ups, ground Desktop-relative workspaces, and reserve cancellation for explicit stop requests.
+
+## [0.3.0] - 2026-08-14
 
 ### Fixed
 
