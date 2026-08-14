@@ -12,7 +12,7 @@ onnxruntime==1.23.2
 sounddevice==0.5.3
 faster-whisper==1.2.1
 ctranslate2==4.6.2
-av==16.0.1
+av==18.0.0
 huggingface-hub==0.36.2
 kokoro==0.9.4
 torch==2.3.1
