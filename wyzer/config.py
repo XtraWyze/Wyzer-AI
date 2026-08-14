@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, model_validator
 
+from wyzer.coding.models import CodingAgentSettings
+
 
 class StrictSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -118,6 +120,7 @@ class WyzerSettings(StrictSettings):
     event_ledger_size: int = Field(default=500, ge=10, le=100_000)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     task_engine: TaskEngineSettings = Field(default_factory=TaskEngineSettings)
+    coding_agent: CodingAgentSettings = Field(default_factory=CodingAgentSettings)
     personality: PersonalitySettings = Field(default_factory=PersonalitySettings)
     speech: SpeechSettings = Field(default_factory=SpeechSettings)
 
@@ -176,6 +179,7 @@ class WyzerSettings(StrictSettings):
             "WYZER_EVENT_LEDGER_SIZE": (("event_ledger_size",), int),
             "WYZER_MEMORY_ENABLED": (("memory", "enabled"), _parse_bool),
             "WYZER_TASK_ENGINE_ENABLED": (("task_engine", "enabled"), _parse_bool),
+            "WYZER_CODING_AGENT_ENABLED": (("coding_agent", "enabled"), _parse_bool),
             "WYZER_ASSISTANT_NAME": (("personality", "assistant_name"), str),
             "WYZER_SPEECH_ENABLED": (("speech", "enabled"), _parse_bool),
             "WYZER_WAKE_PHRASE": (("speech", "wake_phrase"), str),

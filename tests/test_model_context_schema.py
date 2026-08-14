@@ -34,6 +34,10 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "control_master_audio",
     "control_media",
     "control_named_window",
+    "coding_agent_cancel",
+    "coding_agent_message",
+    "coding_agent_start",
+    "coding_agent_status",
     "copy_path",
     "copy_selected_text",
     "create_directory",
@@ -72,7 +76,7 @@ EXPECTED_MODEL_TOOL_NAMES = {
     "write_clipboard",
     "write_text_file",
 }
-EXPECTED_SEMANTIC_SCHEMA_SHA256 = "afa91845473b6dec471aa279644c373e924d8e5468f40702d2b3b5ae1661dd41"
+EXPECTED_SEMANTIC_SCHEMA_SHA256 = "0bf33541c967311ee2e13d3ce13444ebfd80bb5661793a6c44a68237f30e107b"
 
 
 def _semantic_schema(value: Any) -> Any:

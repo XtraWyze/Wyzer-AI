@@ -44,9 +44,19 @@ intent, import code, execute an action, or count as evidence. Registered hidden 
 in every view.
 
 Applications, windows, audio, media, and lightweight system inspection stay in the default view so
-routine requests do not pay a discovery round. Browser, clipboard, desktop interaction,
-diagnostics, files, perception, and enabled third-party packs are activated on demand. There is no
+routine requests do not pay a discovery round. The four coding-agent coordination proxies also stay
+in the default view so a small model can delegate self-contained software work directly. Browser,
+clipboard, desktop interaction, diagnostics, files, perception, and enabled third-party packs are
+activated on demand. There is no
 keyword/regex capability router and no second planner model.
+
+The `coding_agent` pack is a persistent coordination surface. Its four proxy definitions remain
+registry-owned and pass ordinary visibility and Pydantic validation, but `Orchestrator` executes
+them through a main-process `CodingAgentManager` instead of a disposable worker. The manager reuses
+the exact primary `ChatProvider` object with a coding-specific prompt, separate bounded message
+histories, workspace-scoped tools, and its own bounded native-tool loop. Only a compact session
+summary and structured result return to the main conversation. See
+[`CODING_AGENT.md`](CODING_AGENT.md).
 
 For longer work with meaningful dependencies, intermediate artifacts, retries, recovery, or
 cross-step verification, the same chat model can call the orchestrator-owned `task_plan_create`,
@@ -64,6 +74,7 @@ unless qualifying evidence exists. An active plan also prevents unsupported fina
 - `app`: native tool loop, compact tool context, and text/voice interfaces.
 - `brain`: typed chat provider boundary, Ollama/OpenAI-compatible adapters, and system prompt.
 - `conversation`: bounded transcript, native message history, and session-only continuity facts.
+- `coding`: retained coding sessions, coding prompt/loop, workspace containment, and coding-only tools.
 - `desktop`: Windows application index plus Win32 process, window, monitor, audio, and media backends.
 - `perception`: on-demand Windows screenshot capture and the local Ollama vision client.
 - `events`: bounded structured event ledger.

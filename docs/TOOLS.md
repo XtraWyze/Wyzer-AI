@@ -15,6 +15,15 @@ execution, or evidence handling. It is capability visibility filtering, not inte
 in that plan. The activated tools are offered on the next provider round. Unrelated packs do not
 accumulate across completed actions, and hidden/internal tools are never surfaced.
 
+The default `coding_agent` pack exposes only four coordination tools to Wyzer's main model:
+`coding_agent_start`, `coding_agent_message`, `coding_agent_status`, and `coding_agent_cancel`.
+They are validated by this registry, then handled by the persistent main-process coding manager;
+they are never ordinary disposable worker calls. The coding agent's eight file/search/command/Git
+tools are private to its separate model context. See [`CODING_AGENT.md`](CODING_AGENT.md).
+An explicitly requested new project path can be created by `coding_agent_start`; ordinary starts
+still require an existing directory. Follow-ups continue the retained session, while cancellation
+is used only for an explicit stop request.
+
 ## Capability packs
 
 ### Applications

@@ -2,6 +2,20 @@
 
 All notable changes to Wyzer are documented here.
 
+## [0.3.1] - 2026-08-14
+
+### Added
+
+- Add a dedicated, persistent coding-agent subsystem that reuses Wyzer's configured model while
+  keeping a separate bounded conversation and workspace-scoped file, search, command, and Git tools.
+- Add coding-agent configuration, documentation, model-acceptance cases, and end-to-end coverage for
+  creating, continuing, running, testing, and debugging software projects.
+
+### Changed
+
+- Route software-development requests directly to the coding agent, preserve coding sessions across
+  follow-ups, ground Desktop-relative workspaces, and reserve cancellation for explicit stop requests.
+
 ## [0.3.0] - 2026-08-14
 
 ### Fixed

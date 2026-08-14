@@ -14,6 +14,7 @@ from functools import partial
 
 from wyzer.app.orchestrator import Orchestrator
 from wyzer.brain import ChatProvider, create_chat_provider, diagnostic_provider
+from wyzer.coding.manager import CodingAgentManager
 from wyzer.config import WyzerSettings
 from wyzer.events import EventLedger
 from wyzer.files import run_startup_quick_scan
@@ -39,6 +40,7 @@ from wyzer.workers import InProcessExecutor, IsolatedExecutor
 
 
 def build_assistant(settings: WyzerSettings, provider: ChatProvider | None = None) -> Orchestrator:
+    active_provider = provider or create_chat_provider(settings.llm, settings.personality)
     registry_factory = partial(
         create_default_registry,
         audio_options=settings.audio.model_dump(),
@@ -55,6 +57,7 @@ def build_assistant(settings: WyzerSettings, provider: ChatProvider | None = Non
             "context_length": settings.llm.context_length,
         },
         enabled_entrypoint_packs=tuple(settings.tool_packs.enabled),
+        coding_agent_enabled=settings.coding_agent.enabled,
     )
     registry = registry_factory()
     executor = (
@@ -74,7 +77,7 @@ def build_assistant(settings: WyzerSettings, provider: ChatProvider | None = Non
     return Orchestrator(
         registry,
         executor,
-        provider or create_chat_provider(settings.llm, settings.personality),
+        active_provider,
         maximum_tool_rounds=settings.maximum_tool_rounds,
         tool_result_context_characters=settings.tool_result_context_characters,
         ledger=EventLedger(settings.event_ledger_size),
@@ -92,6 +95,11 @@ def build_assistant(settings: WyzerSettings, provider: ChatProvider | None = Non
         ),
         personality=settings.personality.model_dump(),
         detailed_output_tokens=settings.llm.detailed_output_tokens,
+        coding_manager=(
+            CodingAgentManager(active_provider, settings.coding_agent)
+            if settings.coding_agent.enabled
+            else None
+        ),
     )
 
 

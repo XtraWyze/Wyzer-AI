@@ -119,6 +119,7 @@ def test_default_factory_composes_builtin_and_extra_packs() -> None:
         "browser",
         "capabilities",
         "clipboard",
+        "coding_agent",
         "desktop_interaction",
         "diagnostics",
         "example",

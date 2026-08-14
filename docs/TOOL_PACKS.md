@@ -6,7 +6,7 @@ results.
 
 ## Built-in packs
 
-The default registry contains twelve focused packs:
+The default registry contains thirteen focused packs:
 
 - `capabilities`: compact model-driven pack discovery and activation coordination.
 
@@ -14,6 +14,7 @@ The default registry contains twelve focused packs:
 - `audio`: master and per-application Windows audio controls.
 - `browser`: managed Chrome/Edge webpage navigation, inspection, interaction, history, and tabs.
 - `clipboard`: clipboard read/write plus focused-window copy and paste.
+- `coding_agent`: retained workspace-scoped software-development delegation.
 - `desktop_interaction`: inspect and interact with controls in the focused Windows desktop app.
 - `diagnostics`: bounded read-only Windows telemetry and health diagnostics.
 - `files`: indexed file search, bounded text reads, quick startup refresh, confirmed deep scans,
@@ -23,10 +24,16 @@ The default registry contains twelve focused packs:
 - `system`: system profile, process inspection, and bounded waits.
 - `windows`: named-window control and physical monitor movement.
 
-The built-in registry contains 68 tools. Applications, audio, media, system, windows, and capability
+Applications, audio, media, system, windows, and capability
 coordination are in the default model view. Browser, clipboard, desktop interaction, diagnostics,
-files, and perception remain built in but are activated on demand by the primary LLM. Built-in packs
+files, and perception remain built in but are activated on demand by the primary LLM. The four
+coding-agent coordination proxies are also in the default view. Built-in packs
 do not need separate installation and must not be listed under `[tool_packs].enabled`.
+
+The coding pack differs from normal worker-backed packs: its registry entries are four compact
+coordination proxies, while `Orchestrator` dispatches them to a persistent main-process manager. The
+manager reuses the same configured provider/model but owns separate conversation histories and eight
+coding-only tools. See [`CODING_AGENT.md`](CODING_AGENT.md).
 
 ## Migrating from the old optional packs
 

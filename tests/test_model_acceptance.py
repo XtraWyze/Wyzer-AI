@@ -40,6 +40,9 @@ def test_model_acceptance_cases_are_valid_and_cover_key_routes() -> None:
         "open_named_project_folder",
         "create_text_file_directly",
         "create_batch_file_directly",
+        "create_python_calculator_with_coding_agent",
+        "create_new_python_game_with_coding_agent",
+        "create_desktop_relative_python_game_with_coding_agent",
     } <= identifiers
 
 
